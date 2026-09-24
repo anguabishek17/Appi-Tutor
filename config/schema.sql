@@ -62,6 +62,7 @@ CREATE TABLE tutor_profiles (
     dbs_certificate_path VARCHAR(500) NULL,
     dbs_verified_at TIMESTAMP NULL,
     approval_status ENUM('PENDING', 'APPROVED', 'REJECTED', 'SUSPENDED') NOT NULL DEFAULT 'PENDING',
+    teaching_mode ENUM('ONLINE', 'IN_PERSON', 'BOTH') NOT NULL DEFAULT 'BOTH',
     approved_by INT UNSIGNED NULL,
     approval_notes TEXT NULL,
     is_featured BOOLEAN NOT NULL DEFAULT FALSE,
@@ -270,3 +271,65 @@ CREATE INDEX idx_audit_created ON audit_logs(created_at);
 INSERT INTO users (id, firebase_uid, role_id, email, first_name, last_name, phone, avatar_url, status)
 VALUES (1, 'manager_demo_uid_001', 1, 'manager@appitutors.co.uk', 'Operations', 'Manager', '+44 20 7946 0912', NULL, 'ACTIVE')
 ON DUPLICATE KEY UPDATE updated_at = NOW();
+
+-- Initial Seed: Common UK Subjects across Curricula
+INSERT INTO subjects (curriculum_id, name, slug) VALUES
+-- Primary KS1 & KS2 (id: 1)
+(1, 'Primary Mathematics', 'primary-mathematics'),
+(1, 'Primary English (Reading & Writing)', 'primary-english'),
+(1, 'Primary Science', 'primary-science'),
+(1, 'Phonics & Early Reading', 'phonics-early-reading'),
+
+-- 11+ & Entrance Exams (id: 2)
+(2, '11+ Verbal Reasoning', '11-plus-verbal-reasoning'),
+(2, '11+ Non-Verbal Reasoning', '11-plus-non-verbal-reasoning'),
+(2, '11+ Mathematics', '11-plus-mathematics'),
+(2, '11+ English Comprehension', '11-plus-english-comprehension'),
+
+-- Secondary KS3 (id: 3)
+(3, 'KS3 Mathematics', 'ks3-mathematics'),
+(3, 'KS3 English', 'ks3-english'),
+(3, 'KS3 Science', 'ks3-science'),
+(3, 'KS3 French', 'ks3-french'),
+(3, 'KS3 Spanish', 'ks3-spanish'),
+(3, 'KS3 History', 'ks3-history'),
+(3, 'KS3 Geography', 'ks3-geography'),
+
+-- GCSE & IGCSE (id: 4)
+(4, 'GCSE Mathematics (Foundation & Higher)', 'gcse-mathematics'),
+(4, 'GCSE English Language', 'gcse-english-language'),
+(4, 'GCSE English Literature', 'gcse-english-literature'),
+(4, 'GCSE Biology', 'gcse-biology'),
+(4, 'GCSE Chemistry', 'gcse-chemistry'),
+(4, 'GCSE Physics', 'gcse-physics'),
+(4, 'GCSE Combined Science', 'gcse-combined-science'),
+(4, 'GCSE Computer Science', 'gcse-computer-science'),
+(4, 'GCSE French', 'gcse-french'),
+(4, 'GCSE Spanish', 'gcse-spanish'),
+(4, 'GCSE History', 'gcse-history'),
+(4, 'GCSE Geography', 'gcse-geography'),
+(4, 'GCSE Business Studies', 'gcse-business-studies'),
+(4, 'GCSE Economics', 'gcse-economics'),
+
+-- A-Level & AS (id: 5)
+(5, 'A-Level Mathematics', 'a-level-mathematics'),
+(5, 'A-Level Further Mathematics', 'a-level-further-mathematics'),
+(5, 'A-Level Physics', 'a-level-physics'),
+(5, 'A-Level Chemistry', 'a-level-chemistry'),
+(5, 'A-Level Biology', 'a-level-biology'),
+(5, 'A-Level English Literature', 'a-level-english-literature'),
+(5, 'A-Level Economics', 'a-level-economics'),
+(5, 'A-Level Computer Science', 'a-level-computer-science'),
+(5, 'A-Level Psychology', 'a-level-psychology'),
+(5, 'A-Level History', 'a-level-history'),
+
+-- IB (id: 6)
+(6, 'IB Mathematics Analysis & Approaches (HL/SL)', 'ib-math-aa'),
+(6, 'IB Mathematics Applications & Interpretation (HL/SL)', 'ib-math-ai'),
+(6, 'IB Physics (HL/SL)', 'ib-physics'),
+(6, 'IB Chemistry (HL/SL)', 'ib-chemistry'),
+(6, 'IB Biology (HL/SL)', 'ib-biology'),
+(6, 'IB Economics (HL/SL)', 'ib-economics'),
+(6, 'IB English A: Literature', 'ib-english-a')
+ON DUPLICATE KEY UPDATE name = VALUES(name);
+

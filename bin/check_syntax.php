@@ -14,7 +14,7 @@ function scanPhpFiles($dir, &$files) {
     }
 }
 
-scanPhpFiles(__DIR__, $files);
+scanPhpFiles(dirname(__DIR__), $files);
 
 $hasError = false;
 foreach ($files as $f) {

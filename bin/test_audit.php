@@ -29,6 +29,9 @@ function assertTest(string $title, bool $condition) {
 $db = Connection::getInstance();
 assertTest("Database connection established", $db instanceof PDO);
 
+// Clean up test users for clean test run
+$db->exec("DELETE FROM users WHERE email IN ('student@test.co.uk', 'tutor@test.co.uk')");
+
 // 2. Test Role Escalation Prevention: Browser requests MANAGER role
 AuthService::logout();
 $userStudent = AuthService::loginWithFirebase(

@@ -1,5 +1,4 @@
-<?php
-declare(strict_types=1);
+<?php declare(strict_types=1);
 
 /**
  * Tutor Portal: Active Dashboard
@@ -8,9 +7,35 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../src/bootstrap.php';
 
 use App\Middleware\AuthMiddleware;
+use App\Database\Connection;
 
 // Require APPROVED tutor status
 $user = AuthMiddleware::requireApprovedTutor();
+$db = Connection::getInstance();
+$userId = (int)$user['id'];
+
+// Fetch tutor details and metrics
+$tpStmt = $db->prepare('
+    SELECT 
+        tp.id AS tutor_profile_id,
+        tp.headline,
+        tp.bio,
+        tp.hourly_rate,
+        tp.experience_years,
+        tp.qualifications,
+        tp.teaching_mode,
+        (SELECT COUNT(*) FROM tutor_subjects ts WHERE ts.tutor_profile_id = tp.id) AS subjects_count,
+        (SELECT COUNT(*) FROM availability_slots av WHERE av.tutor_profile_id = tp.id AND av.is_blocked = 0 AND av.start_time > NOW()) AS active_slots_count
+    FROM tutor_profiles tp
+    WHERE tp.user_id = :uid
+    LIMIT 1
+');
+$tpStmt->execute([':uid' => $userId]);
+$profile = $tpStmt->fetch() ?: [];
+
+$tutorProfileId = (int)($profile['tutor_profile_id'] ?? 0);
+$subjectsCount = (int)($profile['subjects_count'] ?? 0);
+$activeSlotsCount = (int)($profile['active_slots_count'] ?? 0);
 ?>
 <!DOCTYPE html>
 <html lang="en" class="h-full bg-slate-50">
@@ -26,27 +51,39 @@ $user = AuthMiddleware::requireApprovedTutor();
 </head>
 <body class="min-h-full flex flex-col justify-between text-slate-800">
 
-    <header class="bg-white border-b border-slate-200">
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold">
-                    A
-                </div>
-                <span class="text-xl font-bold text-slate-900">Appi<span class="text-indigo-600">Tutors</span> <span class="text-xs ml-2 px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-medium">Approved Tutor</span></span>
+            <div class="flex items-center gap-6">
+                <a href="/tutor/dashboard.php" class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold">
+                        A
+                    </div>
+                    <span class="text-xl font-bold text-slate-900">Appi<span class="text-indigo-600">Tutors</span> <span class="text-xs ml-2 px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-medium">Approved Tutor</span></span>
+                </a>
+                <nav class="hidden md:flex items-center gap-2 text-sm font-semibold">
+                    <a href="/tutor/dashboard.php" class="px-3 py-1.5 text-indigo-600 bg-indigo-50 rounded-lg">Overview</a>
+                    <a href="/tutor/profile.php" class="px-3 py-1.5 text-slate-600 hover:text-indigo-600 rounded-lg">Profile</a>
+                    <a href="/tutor/subjects.php" class="px-3 py-1.5 text-slate-600 hover:text-indigo-600 rounded-lg">Subjects</a>
+                    <a href="/tutor/availability.php" class="px-3 py-1.5 text-slate-600 hover:text-indigo-600 rounded-lg">Availability</a>
+                </nav>
             </div>
             <div class="flex items-center gap-4 text-sm font-semibold">
+                <?php if ($tutorProfileId > 0): ?>
+                    <a href="/tutor.php?id=<?= $tutorProfileId ?>" target="_blank" class="text-xs text-indigo-600 hover:underline">View Public Profile ↗</a>
+                <?php endif; ?>
                 <span class="text-slate-600"><?= htmlspecialchars($user['first_name'] . ' ' . $user['last_name']) ?></span>
-                <a href="/logout.php" class="text-red-600 hover:text-red-700">Sign out</a>
+                <a href="/logout.php" class="text-rose-600 hover:text-rose-700">Sign out</a>
             </div>
         </div>
     </header>
 
     <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
         <div class="mb-8">
-            <h1 class="text-2xl font-extrabold text-slate-900">Welcome, <?= htmlspecialchars($user['first_name']) ?>! 👋</h1>
-            <p class="text-slate-600 mt-1">Your tutor account is verified and active.</p>
+            <h1 class="text-2xl font-extrabold text-slate-900">Welcome back, <?= htmlspecialchars($user['first_name']) ?>! 👋</h1>
+            <p class="text-slate-600 mt-1">Manage your tutor profile, subjects taught, and scheduled availability slots.</p>
         </div>
 
+        <!-- Metric Cards -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                 <div class="text-xs font-bold text-slate-500 uppercase tracking-wider">Account Status</div>
@@ -54,19 +91,52 @@ $user = AuthMiddleware::requireApprovedTutor();
                     <span class="w-3 h-3 rounded-full bg-emerald-500"></span>
                     <span class="text-lg font-bold text-slate-900">Verified & Approved</span>
                 </div>
-                <p class="text-xs text-slate-500 mt-2">Ready to receive student booking requests.</p>
+                <p class="text-xs text-slate-500 mt-2">Publicly visible and bookable in search.</p>
             </div>
 
             <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                <div class="text-xs font-bold text-slate-500 uppercase tracking-wider">Availability & Subjects</div>
-                <div class="mt-2 text-lg font-bold text-slate-900">Upcoming Module</div>
-                <p class="text-xs text-slate-500 mt-2">Calendar slots and subject selector available in next phase.</p>
+                <div class="text-xs font-bold text-slate-500 uppercase tracking-wider">Teaching Subjects</div>
+                <div class="mt-2 text-2xl font-extrabold text-indigo-600"><?= $subjectsCount ?> Assigned</div>
+                <p class="text-xs text-slate-500 mt-2"><a href="/tutor/subjects.php" class="text-indigo-600 hover:underline">Manage selected subjects &rarr;</a></p>
             </div>
 
             <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                <div class="text-xs font-bold text-slate-500 uppercase tracking-wider">Active Bookings</div>
-                <div class="mt-2 text-lg font-bold text-slate-900">0 Lessons</div>
-                <p class="text-xs text-slate-500 mt-2">Lesson requests will appear here.</p>
+                <div class="text-xs font-bold text-slate-500 uppercase tracking-wider">Active Availability Slots</div>
+                <div class="mt-2 text-2xl font-extrabold text-slate-900"><?= $activeSlotsCount ?> Open</div>
+                <p class="text-xs text-slate-500 mt-2"><a href="/tutor/availability.php" class="text-indigo-600 hover:underline">Manage schedule &rarr;</a></p>
+            </div>
+        </div>
+
+        <!-- Quick Action Hub -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 mb-8">
+            <h2 class="text-lg font-bold text-slate-900 mb-4">Tutor Portal Actions</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <a href="/tutor/profile.php" class="p-5 rounded-xl border border-slate-200 hover:border-indigo-500 hover:bg-indigo-50/20 transition flex flex-col justify-between">
+                    <div>
+                        <div class="text-2xl mb-2">👤</div>
+                        <div class="font-bold text-slate-900">Profile & Rates</div>
+                        <div class="text-xs text-slate-500 mt-1">Set headline, hourly rate (£<?= number_format((float)($profile['hourly_rate'] ?? 35), 2) ?>), bio, and qualifications.</div>
+                    </div>
+                    <span class="text-indigo-600 font-bold text-xs mt-4">Edit Profile &rarr;</span>
+                </a>
+
+                <a href="/tutor/subjects.php" class="p-5 rounded-xl border border-slate-200 hover:border-indigo-500 hover:bg-indigo-50/20 transition flex flex-col justify-between">
+                    <div>
+                        <div class="text-2xl mb-2">📚</div>
+                        <div class="font-bold text-slate-900">Subjects & Curricula</div>
+                        <div class="text-xs text-slate-500 mt-1">Choose the specific subjects (KS1-3, GCSE, A-Level, IB) you tutor.</div>
+                    </div>
+                    <span class="text-indigo-600 font-bold text-xs mt-4">Select Subjects &rarr;</span>
+                </a>
+
+                <a href="/tutor/availability.php" class="p-5 rounded-xl border border-slate-200 hover:border-indigo-500 hover:bg-indigo-50/20 transition flex flex-col justify-between">
+                    <div>
+                        <div class="text-2xl mb-2">📅</div>
+                        <div class="font-bold text-slate-900">Calendar Slots</div>
+                        <div class="text-xs text-slate-500 mt-1">Add dated availability slots for 1-to-1 or group sessions.</div>
+                    </div>
+                    <span class="text-indigo-600 font-bold text-xs mt-4">Manage Slots &rarr;</span>
+                </a>
             </div>
         </div>
     </main>
