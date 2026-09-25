@@ -1,5 +1,4 @@
-<?php
-declare(strict_types=1);
+<?php declare(strict_types=1);
 
 /**
  * Parent & Student Portal: Dashboard
@@ -8,9 +7,17 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../src/bootstrap.php';
 
 use App\Middleware\AuthMiddleware;
+use App\Database\Connection;
 
 // Require STUDENT_PARENT role
 $user = AuthMiddleware::requireRole(['STUDENT_PARENT']);
+$db = Connection::getInstance();
+$parentUserId = (int)$user['id'];
+
+// Get metric counts
+$childrenCount = (int)$db->query("SELECT COUNT(*) FROM students_children WHERE parent_user_id = $parentUserId")->fetchColumn();
+$bookingsCount = (int)$db->query("SELECT COUNT(*) FROM bookings WHERE parent_user_id = $parentUserId")->fetchColumn();
+$pendingBookingsCount = (int)$db->query("SELECT COUNT(*) FROM bookings WHERE parent_user_id = $parentUserId AND status = 'PENDING'")->fetchColumn();
 ?>
 <!DOCTYPE html>
 <html lang="en" class="h-full bg-slate-50">
@@ -26,17 +33,25 @@ $user = AuthMiddleware::requireRole(['STUDENT_PARENT']);
 </head>
 <body class="min-h-full flex flex-col justify-between text-slate-800">
 
-    <header class="bg-white border-b border-slate-200">
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold">
-                    A
-                </div>
-                <span class="text-xl font-bold text-slate-900">Appi<span class="text-indigo-600">Tutors</span> <span class="text-xs ml-2 px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-medium">Parent & Student Portal</span></span>
+            <div class="flex items-center gap-6">
+                <a href="/parent/dashboard.php" class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold">
+                        A
+                    </div>
+                    <span class="text-xl font-bold text-slate-900">Appi<span class="text-indigo-600">Tutors</span> <span class="text-xs ml-2 px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-medium">Parent Portal</span></span>
+                </a>
+                <nav class="hidden md:flex items-center gap-2 text-sm font-semibold">
+                    <a href="/parent/dashboard.php" class="px-3 py-1.5 text-indigo-600 bg-indigo-50 rounded-lg">Overview</a>
+                    <a href="/parent/children.php" class="px-3 py-1.5 text-slate-600 hover:text-indigo-600 rounded-lg">Children</a>
+                    <a href="/parent/bookings.php" class="px-3 py-1.5 text-slate-600 hover:text-indigo-600 rounded-lg">My Bookings</a>
+                    <a href="/tutors.php" class="px-3 py-1.5 text-slate-600 hover:text-indigo-600 rounded-lg">Find a Tutor</a>
+                </nav>
             </div>
             <div class="flex items-center gap-4 text-sm font-semibold">
                 <span class="text-slate-600"><?= htmlspecialchars($user['first_name'] . ' ' . $user['last_name']) ?></span>
-                <a href="/logout.php" class="text-red-600 hover:text-red-700">Sign out</a>
+                <a href="/logout.php" class="text-rose-600 hover:text-rose-700">Sign out</a>
             </div>
         </div>
     </header>
@@ -56,25 +71,40 @@ $user = AuthMiddleware::requireRole(['STUDENT_PARENT']);
 
             <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                 <div class="text-xs font-bold text-slate-500 uppercase tracking-wider">Children Profiles</div>
-                <div class="mt-2 text-lg font-bold text-slate-900">Ready to add</div>
-                <p class="text-xs text-slate-500 mt-2">Child profile creation unlocks in next module.</p>
+                <div class="mt-2 text-2xl font-extrabold text-slate-900"><?= $childrenCount ?> Registered</div>
+                <p class="text-xs text-slate-500 mt-2"><a href="/parent/children.php" class="text-indigo-600 hover:underline">Manage children &rarr;</a></p>
             </div>
 
             <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                <div class="text-xs font-bold text-slate-500 uppercase tracking-wider">Upcoming Lessons</div>
-                <div class="mt-2 text-lg font-bold text-slate-900">0 Scheduled</div>
-                <p class="text-xs text-slate-500 mt-2">Bookings workflow unlocks in next phase.</p>
+                <div class="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Bookings</div>
+                <div class="mt-2 text-2xl font-extrabold text-slate-900"><?= $bookingsCount ?> (<?= $pendingBookingsCount ?> Pending)</div>
+                <p class="text-xs text-slate-500 mt-2"><a href="/parent/bookings.php" class="text-indigo-600 hover:underline">View all bookings &rarr;</a></p>
             </div>
         </div>
 
-        <div class="bg-indigo-600 rounded-2xl p-6 sm:p-8 text-white flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl shadow-indigo-200">
-            <div>
-                <h3 class="text-xl font-bold">Find expert tutors for your child</h3>
-                <p class="text-indigo-100 text-sm mt-1">Browse verified UK tutors across Primary, GCSE, and A-Level subjects.</p>
+        <!-- Action Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm flex flex-col justify-between">
+                <div>
+                    <div class="text-3xl mb-2">👶</div>
+                    <h3 class="font-extrabold text-slate-900 text-lg">Manage Children Profiles</h3>
+                    <p class="text-slate-600 text-xs mt-1 leading-relaxed">Add student learning goals, year groups (Primary, 11+, GCSE, A-Level), and special study requirements.</p>
+                </div>
+                <a href="/parent/children.php" class="mt-4 inline-block px-4 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-bold text-xs rounded-xl transition w-fit">
+                    Open Children Hub &rarr;
+                </a>
             </div>
-            <a href="/" class="px-6 py-3 bg-white text-indigo-600 font-bold rounded-xl hover:bg-indigo-50 shadow-md transition whitespace-nowrap text-sm">
-                Explore Website
-            </a>
+
+            <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm flex flex-col justify-between">
+                <div>
+                    <div class="text-3xl mb-2">🔍</div>
+                    <h3 class="font-extrabold text-slate-900 text-lg">Find & Book Expert Tutors</h3>
+                    <p class="text-slate-600 text-xs mt-1 leading-relaxed">Search vetted, DBS-checked educators across England, Scotland, Wales, and Northern Ireland.</p>
+                </div>
+                <a href="/tutors.php" class="mt-4 inline-block px-4 py-2 bg-indigo-600 text-white hover:bg-indigo-700 font-bold text-xs rounded-xl shadow-md transition w-fit">
+                    Search Marketplace &rarr;
+                </a>
+            </div>
         </div>
     </main>
 

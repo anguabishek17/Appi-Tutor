@@ -8,6 +8,7 @@ require_once __DIR__ . '/../src/bootstrap.php';
 
 use App\Auth\AuthService;
 use App\Database\Connection;
+use App\Services\CsrfService;
 
 $user = AuthService::user();
 $db = Connection::getInstance();
@@ -98,6 +99,15 @@ $slotStmt = $db->prepare('
 $slotStmt->execute([':tpid' => $tutorProfileId]);
 $slots = $slotStmt->fetchAll();
 
+// If user is a logged-in parent, fetch their children for instant booking request
+$parentChildren = [];
+if ($user && ($user['role'] ?? '') === 'STUDENT_PARENT') {
+    $cStmt = $db->prepare('SELECT id, first_name, last_name, year_group FROM students_children WHERE parent_user_id = :pid ORDER BY first_name ASC');
+    $cStmt->execute([':pid' => $user['id']]);
+    $parentChildren = $cStmt->fetchAll();
+}
+
+$csrfToken = CsrfService::getToken();
 $initials = ($tutor['first_name'][0] ?? '') . ($tutor['last_name'][0] ?? '');
 $teachingModeBadge = $tutor['teaching_mode'] === 'ONLINE' ? 'Online Tutoring Only' : ($tutor['teaching_mode'] === 'IN_PERSON' ? 'In-Person Tutoring Only' : 'Available Online & In-Person');
 ?>
@@ -246,7 +256,7 @@ $teachingModeBadge = $tutor['teaching_mode'] === 'ONLINE' ? 'Online Tutoring Onl
                         <h2 class="text-lg font-extrabold text-slate-900">Available Slots</h2>
                         <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800"><?= count($slots) ?> open</span>
                     </div>
-                    <p class="text-xs text-slate-500 mb-4">Select an upcoming session slot to book with <?= htmlspecialchars($tutor['first_name']) ?>. (Booking will be available in Phase 4).</p>
+                    <p class="text-xs text-slate-500 mb-4">Select an upcoming session slot to book with <?= htmlspecialchars($tutor['first_name']) ?>.</p>
 
                     <?php if (empty($slots)): ?>
                         <div class="text-center py-8 border-2 border-dashed border-slate-200 rounded-xl">
@@ -279,7 +289,8 @@ $teachingModeBadge = $tutor['teaching_mode'] === 'ONLINE' ? 'Online Tutoring Onl
                                     </div>
                                     <div class="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
                                         <span class="text-emerald-700 font-bold">✓ <?= (int)$slot['spaces_left'] ?> space<?= (int)$slot['spaces_left'] === 1 ? '' : 's' ?> left</span>
-                                        <button type="button" onclick="alert('Lesson booking will be activated in Phase 4!');" class="px-3 py-1 bg-slate-900 hover:bg-indigo-600 text-white font-bold rounded-lg transition text-[11px]">
+                                        <button type="button" onclick="openBookingModal(<?= (int)$slot['slot_id'] ?>, '<?= $start->format('D, d M Y H:i') ?>')" 
+                                                class="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition text-[11px] shadow-sm">
                                             Book Slot &rarr;
                                         </button>
                                     </div>
@@ -292,6 +303,67 @@ $teachingModeBadge = $tutor['teaching_mode'] === 'ONLINE' ? 'Online Tutoring Onl
         </div>
     </main>
 
+    <!-- Booking Request Modal -->
+    <div id="bookingModal" class="hidden fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div>
+                    <h3 class="text-lg font-bold text-slate-900">Request Lesson Booking</h3>
+                    <p id="modalSlotTime" class="text-xs text-indigo-600 font-semibold mt-0.5"></p>
+                </div>
+                <button type="button" onclick="closeBookingModal()" class="text-slate-400 hover:text-slate-600 text-lg font-bold">&times;</button>
+            </div>
+
+            <?php if (!$user): ?>
+                <div class="text-center py-6 space-y-3">
+                    <p class="text-sm text-slate-600">Please log in as a parent/student to complete this lesson booking request.</p>
+                    <a href="/login.php" class="inline-block px-5 py-2.5 bg-indigo-600 text-white font-bold text-sm rounded-xl shadow-md">Log In to Continue</a>
+                </div>
+            <?php elseif (($user['role'] ?? '') !== 'STUDENT_PARENT'): ?>
+                <div class="p-4 bg-amber-50 text-amber-800 text-xs rounded-xl font-medium">
+                    You are currently logged in with role <strong><?= htmlspecialchars($user['role'] ?? '') ?></strong>. Booking lessons is available for Student/Parent accounts.
+                </div>
+            <?php elseif (empty($parentChildren)): ?>
+                <div class="text-center py-4 space-y-3">
+                    <p class="text-sm text-slate-600">You need to create a child profile first before requesting a lesson.</p>
+                    <a href="/parent/children.php" class="inline-block px-5 py-2.5 bg-indigo-600 text-white font-bold text-xs rounded-xl shadow-md">+ Add Child Profile</a>
+                </div>
+            <?php else: ?>
+                <form id="bookingForm" class="space-y-4">
+                    <input type="hidden" id="modal_slot_id" value="">
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Select Student / Child *</label>
+                        <select id="modal_child_id" required class="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                            <?php foreach ($parentChildren as $pc): ?>
+                                <option value="<?= (int)$pc['id'] ?>"><?= htmlspecialchars($pc['first_name'] . ' ' . $pc['last_name']) ?> (<?= htmlspecialchars($pc['year_group'] ?: 'General') ?>)</option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Subject *</label>
+                        <select id="modal_subject_id" required class="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                            <?php foreach ($subjects as $sub): ?>
+                                <option value="<?= (int)$sub['subject_id'] ?>"><?= htmlspecialchars($sub['subject_name']) ?> (<?= htmlspecialchars($sub['curriculum_name']) ?>)</option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Notes for the Tutor (Optional)</label>
+                        <textarea id="modal_notes" rows="2" placeholder="Specific topics or upcoming exam preparation..." class="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"></textarea>
+                    </div>
+
+                    <div class="flex items-center justify-end gap-3 pt-2">
+                        <button type="button" onclick="closeBookingModal()" class="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 text-sm font-semibold hover:bg-slate-50">Cancel</button>
+                        <button type="submit" id="submitBookingBtn" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl shadow-md transition">Request Booking</button>
+                    </div>
+                </form>
+            <?php endif; ?>
+        </div>
+    </div>
+
     <footer class="bg-slate-900 text-slate-400 py-12 border-t border-slate-800 mt-16">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-6">
             <div class="flex items-center gap-3">
@@ -301,5 +373,60 @@ $teachingModeBadge = $tutor['teaching_mode'] === 'ONLINE' ? 'Online Tutoring Onl
             <p class="text-sm">© <?= date('Y') ?> AppiTutors Ltd. All rights reserved.</p>
         </div>
     </footer>
+
+    <script>
+        const bookingModal = document.getElementById('bookingModal');
+        const modalSlotTime = document.getElementById('modalSlotTime');
+        const modalSlotId = document.getElementById('modal_slot_id');
+        const bookingForm = document.getElementById('bookingForm');
+        const submitBookingBtn = document.getElementById('submitBookingBtn');
+
+        function openBookingModal(slotId, slotTimeStr) {
+            modalSlotId.value = slotId;
+            modalSlotTime.textContent = 'Slot: ' + slotTimeStr;
+            bookingModal.classList.remove('hidden');
+        }
+
+        function closeBookingModal() {
+            bookingModal.classList.add('hidden');
+        }
+
+        if (bookingForm) {
+            bookingForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                submitBookingBtn.disabled = true;
+                submitBookingBtn.textContent = 'Requesting...';
+
+                const payload = {
+                    csrf_token: '<?= $csrfToken ?>',
+                    availability_slot_id: parseInt(modalSlotId.value, 10),
+                    student_child_id: parseInt(document.getElementById('modal_child_id').value, 10),
+                    subject_id: parseInt(document.getElementById('modal_subject_id').value, 10),
+                    student_notes: document.getElementById('modal_notes').value
+                };
+
+                try {
+                    const res = await fetch('/api/bookings/create.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    const data = await res.json();
+
+                    if (data.success) {
+                        alert('Booking requested successfully! Ref: ' + data.data.booking_reference);
+                        window.location.href = '/parent/bookings.php';
+                    } else {
+                        alert(data.message || 'Failed to request booking');
+                    }
+                } catch (err) {
+                    alert('Network error while creating booking request.');
+                } finally {
+                    submitBookingBtn.disabled = false;
+                    submitBookingBtn.textContent = 'Request Booking';
+                }
+            });
+        }
+    </script>
 </body>
 </html>
