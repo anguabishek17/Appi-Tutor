@@ -27,7 +27,8 @@ $tpStmt = $db->prepare('
         (SELECT COUNT(*) FROM tutor_subjects ts WHERE ts.tutor_profile_id = tp.id) AS subjects_count,
         (SELECT COUNT(*) FROM availability_slots av WHERE av.tutor_profile_id = tp.id AND av.is_blocked = 0 AND av.start_time > NOW()) AS active_slots_count,
         (SELECT COUNT(*) FROM bookings b WHERE b.tutor_profile_id = tp.id AND b.status = "PENDING") AS pending_bookings_count,
-        (SELECT COUNT(*) FROM bookings b WHERE b.tutor_profile_id = tp.id AND b.status = "ACCEPTED" AND b.scheduled_start >= NOW()) AS upcoming_lessons_count
+        (SELECT COUNT(*) FROM bookings b WHERE b.tutor_profile_id = tp.id AND b.status = "ACCEPTED" AND b.scheduled_start >= NOW()) AS upcoming_lessons_count,
+        (SELECT COUNT(*) FROM bookings b WHERE b.tutor_profile_id = tp.id AND b.status = "COMPLETED") AS completed_lessons_count
     FROM tutor_profiles tp
     WHERE tp.user_id = :uid
     LIMIT 1
@@ -40,6 +41,7 @@ $subjectsCount = (int)($profile['subjects_count'] ?? 0);
 $activeSlotsCount = (int)($profile['active_slots_count'] ?? 0);
 $pendingBookingsCount = (int)($profile['pending_bookings_count'] ?? 0);
 $upcomingLessonsCount = (int)($profile['upcoming_lessons_count'] ?? 0);
+$completedLessonsCount = (int)($profile['completed_lessons_count'] ?? 0);
 ?>
 <!DOCTYPE html>
 <html lang="en" class="h-full bg-slate-50">
@@ -110,9 +112,9 @@ $upcomingLessonsCount = (int)($profile['upcoming_lessons_count'] ?? 0);
             </div>
 
             <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                <div class="text-xs font-bold text-slate-500 uppercase tracking-wider">Teaching Subjects</div>
-                <div class="mt-2 text-2xl font-extrabold text-indigo-600"><?= $subjectsCount ?> Assigned</div>
-                <p class="text-xs text-slate-500 mt-2"><a href="/tutor/subjects.php" class="text-indigo-600 hover:underline">Manage subjects &rarr;</a></p>
+                <div class="text-xs font-bold text-slate-500 uppercase tracking-wider">Completed Lessons</div>
+                <div class="mt-2 text-2xl font-extrabold text-blue-600"><?= $completedLessonsCount ?> Sessions</div>
+                <p class="text-xs text-slate-500 mt-2"><a href="/tutor/bookings.php" class="text-indigo-600 hover:underline">View history & notes &rarr;</a></p>
             </div>
 
             <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">

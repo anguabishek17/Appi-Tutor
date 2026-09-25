@@ -233,4 +233,33 @@ class BookingNotificationService
         EmailService::send($parentEmail, $subject, $parentHtml, null, (int)$booking['id'], 'BOOKING_SYSTEM_CANCELLED', $parentName);
         EmailService::send($tutorEmail, $subject, $tutorHtml, null, (int)$booking['id'], 'BOOKING_SYSTEM_CANCELLED', $tutorName);
     }
+
+    /**
+     * 9. BOOKING_COMPLETED (Sent to Parent)
+     */
+    public static function notifyBookingCompleted(
+        array $booking,
+        string $parentEmail,
+        string $parentName,
+        string $tutorName,
+        string $childName,
+        string $subjectName,
+        string $attendanceStatus
+    ): bool {
+        $subject = "Lesson Completed: {$subjectName} with {$tutorName}";
+        $intro = "Hello {$parentName}, your lesson for {$childName} with {$tutorName} has been marked as completed. Lesson notes and attendance summary are now available in your portal.";
+        $details = [
+            'Booking Reference' => $booking['booking_reference'],
+            'Student' => $childName,
+            'Tutor' => $tutorName,
+            'Subject' => $subjectName,
+            'Date & Time' => $booking['scheduled_start'] . ' (UK)',
+            'Attendance' => $attendanceStatus,
+            'Status' => 'COMPLETED'
+        ];
+
+        $html = self::renderTemplate('Lesson Completed', $intro, $details, 'Log in to your AppiTutors account to view complete lesson notes and recommendations.');
+        return EmailService::send($parentEmail, $subject, $html, null, (int)$booking['id'], 'BOOKING_COMPLETED', $parentName);
+    }
 }
+

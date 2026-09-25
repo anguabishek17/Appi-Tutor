@@ -18,6 +18,8 @@ $parentUserId = (int)$user['id'];
 $childrenCount = (int)$db->query("SELECT COUNT(*) FROM students_children WHERE parent_user_id = $parentUserId")->fetchColumn();
 $bookingsCount = (int)$db->query("SELECT COUNT(*) FROM bookings WHERE parent_user_id = $parentUserId")->fetchColumn();
 $pendingBookingsCount = (int)$db->query("SELECT COUNT(*) FROM bookings WHERE parent_user_id = $parentUserId AND status = 'PENDING'")->fetchColumn();
+$upcomingLessonsCount = (int)$db->query("SELECT COUNT(*) FROM bookings WHERE parent_user_id = $parentUserId AND status IN ('ACCEPTED', 'RESCHEDULE_PROPOSED')")->fetchColumn();
+$completedLessonsCount = (int)$db->query("SELECT COUNT(*) FROM bookings WHERE parent_user_id = $parentUserId AND status = 'COMPLETED'")->fetchColumn();
 ?>
 <!DOCTYPE html>
 <html lang="en" class="h-full bg-slate-50">
@@ -59,26 +61,34 @@ $pendingBookingsCount = (int)$db->query("SELECT COUNT(*) FROM bookings WHERE par
     <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
         <div class="mb-8">
             <h1 class="text-2xl font-extrabold text-slate-900">Hello, <?= htmlspecialchars($user['first_name']) ?> 👋</h1>
-            <p class="text-slate-600 mt-1">Manage your family's tutoring sessions and search verified UK educators.</p>
+            <p class="text-slate-600 mt-1">Manage your family's tutoring sessions, track attendance, and view teacher lesson summaries.</p>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                <div class="text-xs font-bold text-slate-500 uppercase tracking-wider">Account Role</div>
-                <div class="mt-2 text-lg font-bold text-indigo-600">Student / Parent</div>
-                <p class="text-xs text-slate-500 mt-2">Active access to tutor matching and bookings.</p>
+                <div class="text-xs font-bold text-slate-500 uppercase tracking-wider">Pending Requests</div>
+                <div class="mt-2 text-2xl font-extrabold <?= $pendingBookingsCount > 0 ? 'text-amber-600' : 'text-slate-900' ?>">
+                    <?= $pendingBookingsCount ?> Pending
+                </div>
+                <p class="text-xs text-slate-500 mt-2"><a href="/parent/bookings.php" class="text-indigo-600 hover:underline">View requests &rarr;</a></p>
             </div>
 
             <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                <div class="text-xs font-bold text-slate-500 uppercase tracking-wider">Children Profiles</div>
-                <div class="mt-2 text-2xl font-extrabold text-slate-900"><?= $childrenCount ?> Registered</div>
-                <p class="text-xs text-slate-500 mt-2"><a href="/parent/children.php" class="text-indigo-600 hover:underline">Manage children &rarr;</a></p>
+                <div class="text-xs font-bold text-slate-500 uppercase tracking-wider">Upcoming Lessons</div>
+                <div class="mt-2 text-2xl font-extrabold text-emerald-600"><?= $upcomingLessonsCount ?> Confirmed</div>
+                <p class="text-xs text-slate-500 mt-2"><a href="/parent/bookings.php" class="text-indigo-600 hover:underline">View schedule &rarr;</a></p>
             </div>
 
             <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                <div class="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Bookings</div>
-                <div class="mt-2 text-2xl font-extrabold text-slate-900"><?= $bookingsCount ?> (<?= $pendingBookingsCount ?> Pending)</div>
-                <p class="text-xs text-slate-500 mt-2"><a href="/parent/bookings.php" class="text-indigo-600 hover:underline">View all bookings &rarr;</a></p>
+                <div class="text-xs font-bold text-slate-500 uppercase tracking-wider">Completed Lessons</div>
+                <div class="mt-2 text-2xl font-extrabold text-blue-600"><?= $completedLessonsCount ?> Sessions</div>
+                <p class="text-xs text-slate-500 mt-2"><a href="/parent/bookings.php" class="text-indigo-600 hover:underline">View lesson summaries &rarr;</a></p>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                <div class="text-xs font-bold text-slate-500 uppercase tracking-wider">Children Registered</div>
+                <div class="mt-2 text-2xl font-extrabold text-slate-900"><?= $childrenCount ?> Students</div>
+                <p class="text-xs text-slate-500 mt-2"><a href="/parent/children.php" class="text-indigo-600 hover:underline">Manage profiles &rarr;</a></p>
             </div>
         </div>
 

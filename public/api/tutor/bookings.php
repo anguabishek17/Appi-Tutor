@@ -63,6 +63,7 @@ $stmt = $db->prepare("
         b.scheduled_start,
         b.scheduled_end,
         b.status,
+        b.attendance_status,
         b.hourly_rate,
         b.total_amount,
         b.student_notes,
@@ -75,6 +76,7 @@ $stmt = $db->prepare("
         sc.learning_goals AS child_learning_goals,
         u_parent.first_name AS parent_first_name,
         u_parent.last_name AS parent_last_name,
+        ln.id AS lesson_note_id,
         av.session_type,
         av.delivery_mode
     FROM bookings b
@@ -82,9 +84,10 @@ $stmt = $db->prepare("
     JOIN curricula c ON s.curriculum_id = c.id
     JOIN users u_parent ON b.parent_user_id = u_parent.id
     LEFT JOIN students_children sc ON b.student_child_id = sc.id
+    LEFT JOIN lesson_notes ln ON b.id = ln.booking_id
     LEFT JOIN availability_slots av ON av.tutor_profile_id = b.tutor_profile_id AND av.start_time = b.scheduled_start
     WHERE {$whereSql}
-    ORDER BY b.scheduled_start ASC
+    ORDER BY b.scheduled_start DESC
 ");
 $stmt->execute($params);
 $bookings = $stmt->fetchAll();
@@ -92,16 +95,20 @@ $bookings = $stmt->fetchAll();
 // Count summaries
 $pendingCount = 0;
 $acceptedCount = 0;
+$completedCount = 0;
 $rejectedCount = 0;
 
 foreach ($bookings as &$bk) {
     if ($bk['status'] === 'PENDING') $pendingCount++;
     if ($bk['status'] === 'ACCEPTED') $acceptedCount++;
+    if ($bk['status'] === 'COMPLETED') $completedCount++;
     if ($bk['status'] === 'REJECTED') $rejectedCount++;
     
     // Provide default fallback for session type / delivery mode if slot record was removed
     $bk['session_type'] = $bk['session_type'] ?? 'ONE_TO_ONE';
     $bk['delivery_mode'] = $bk['delivery_mode'] ?? 'ONLINE';
+    $bk['attendance_status'] = $bk['attendance_status'] ?? 'NOT_RECORDED';
+    $bk['has_notes'] = !empty($bk['lesson_note_id']);
     $bk['hourly_rate'] = (float)$bk['hourly_rate'];
     $bk['total_amount'] = (float)$bk['total_amount'];
 }
@@ -113,6 +120,7 @@ ResponseService::json([
     'counts' => [
         'pending' => $pendingCount,
         'accepted' => $acceptedCount,
+        'completed' => $completedCount,
         'rejected' => $rejectedCount
     ]
 ], 'Tutor bookings retrieved successfully');
