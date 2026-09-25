@@ -180,6 +180,7 @@ CREATE TABLE bookings (
     ) NOT NULL DEFAULT 'PENDING',
     proposed_reschedule_start TIMESTAMP NULL,
     proposed_reschedule_end TIMESTAMP NULL,
+    proposed_availability_slot_id INT UNSIGNED NULL,
     reschedule_proposed_by ENUM('TUTOR', 'STUDENT_PARENT') NULL,
     rejection_reason TEXT NULL,
     cancellation_reason TEXT NULL,
@@ -191,6 +192,7 @@ CREATE TABLE bookings (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_bookings_parent FOREIGN KEY (parent_user_id) REFERENCES users(id) ON DELETE RESTRICT,
     CONSTRAINT fk_bookings_tutor FOREIGN KEY (tutor_profile_id) REFERENCES tutor_profiles(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_bookings_proposed_slot FOREIGN KEY (proposed_availability_slot_id) REFERENCES availability_slots(id) ON DELETE SET NULL,
     CONSTRAINT fk_bookings_student FOREIGN KEY (student_child_id) REFERENCES students_children(id) ON DELETE SET NULL,
     CONSTRAINT fk_bookings_subject FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

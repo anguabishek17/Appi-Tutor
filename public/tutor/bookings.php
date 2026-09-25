@@ -54,7 +54,7 @@ $csrfToken = CsrfService::getToken();
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
             <div>
                 <h1 class="text-2xl font-extrabold text-slate-900">Booking Management</h1>
-                <p class="text-slate-600 text-sm mt-1">Review incoming lesson requests from parents, confirm sessions, or inspect your schedule.</p>
+                <p class="text-slate-600 text-sm mt-1">Review incoming lesson requests, propose reschedules, confirm sessions, or cancel bookings.</p>
             </div>
             <button type="button" onclick="loadBookings()" class="px-4 py-2 text-xs font-bold text-indigo-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition shadow-2xs">
                 🔄 Refresh Bookings
@@ -108,17 +108,51 @@ $csrfToken = CsrfService::getToken();
         </div>
     </div>
 
+    <!-- Propose Reschedule Modal -->
+    <div id="rescheduleModal" class="hidden fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 class="text-lg font-bold text-slate-900">Propose Reschedule</h3>
+                <button type="button" onclick="closeRescheduleModal()" class="text-slate-400 hover:text-slate-600 text-lg font-bold">&times;</button>
+            </div>
+            
+            <div id="reschedule_booking_info" class="p-3 bg-slate-50 rounded-xl text-xs space-y-1 text-slate-700 border border-slate-200">
+                <!-- Injected via JS -->
+            </div>
+
+            <form id="rescheduleForm" class="space-y-4">
+                <input type="hidden" id="reschedule_booking_id" value="">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Select Replacement Availability Slot</label>
+                    <select id="reschedule_slot_select" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white">
+                        <option value="">Loading available slots...</option>
+                    </select>
+                    <p class="text-[11px] text-slate-500 mt-1">Only unblocked slots at least 24 hours in the future with available capacity are listed.</p>
+                </div>
+
+                <div class="flex items-center justify-end gap-3 pt-2">
+                    <button type="button" onclick="closeRescheduleModal()" class="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 text-sm font-semibold hover:bg-slate-50">Cancel</button>
+                    <button type="submit" id="confirmRescheduleBtn" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl shadow-sm transition">Send Proposal</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <footer class="text-center py-6 text-xs text-slate-500 border-t border-slate-200 bg-white mt-16">
         © <?= date('Y') ?> AppiTutors Ltd.
     </footer>
 
     <script>
         let allBookings = [];
+        let availableSlots = [];
         let currentTab = 'pending';
+        const csrfToken = '<?= $csrfToken ?>';
         const alertBox = document.getElementById('alertBox');
         const container = document.getElementById('bookingsList');
         const rejectModal = document.getElementById('rejectModal');
         const rejectForm = document.getElementById('rejectForm');
+        const rescheduleModal = document.getElementById('rescheduleModal');
+        const rescheduleForm = document.getElementById('rescheduleForm');
 
         function setTab(tab) {
             currentTab = tab;
@@ -154,12 +188,29 @@ $csrfToken = CsrfService::getToken();
             }
         }
 
+        async function loadAvailableSlots() {
+            try {
+                const res = await fetch('/api/tutor/availability.php');
+                const json = await res.json();
+                if (json.success) {
+                    const now = new Date();
+                    const minAllowed = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+                    availableSlots = (json.data.slots || []).filter(s => {
+                        const sTime = new Date(s.start_time.replace(' ', 'T'));
+                        return !s.is_blocked && sTime >= minAllowed && parseInt(s.booked_count, 10) < parseInt(s.max_capacity, 10);
+                    });
+                }
+            } catch (e) {
+                console.error('Failed to load slots', e);
+            }
+        }
+
         function renderBookings() {
             let filtered = allBookings;
             if (currentTab === 'pending') {
                 filtered = allBookings.filter(b => b.status === 'PENDING');
             } else if (currentTab === 'accepted') {
-                filtered = allBookings.filter(b => b.status === 'ACCEPTED');
+                filtered = allBookings.filter(b => b.status === 'ACCEPTED' || b.status === 'RESCHEDULE_PROPOSED');
             }
 
             if (filtered.length === 0) {
@@ -173,6 +224,9 @@ $csrfToken = CsrfService::getToken();
                 return;
             }
 
+            const now = new Date();
+            const minCancel = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+
             let html = '';
             filtered.forEach(b => {
                 const start = new Date(b.scheduled_start.replace(' ', 'T'));
@@ -183,15 +237,21 @@ $csrfToken = CsrfService::getToken();
 
                 const isPending = b.status === 'PENDING';
                 const isAccepted = b.status === 'ACCEPTED';
+                const isRescheduleProposed = b.status === 'RESCHEDULE_PROPOSED';
+                const canCancel = (isAccepted || isPending || isRescheduleProposed) && (start >= minCancel);
+                const canReschedule = (isAccepted || isPending) && (start >= minCancel);
 
-                const statusBadge = isPending 
-                    ? '<span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">Pending Review</span>'
-                    : (isAccepted 
-                        ? '<span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">Confirmed & Accepted</span>'
-                        : '<span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-200">' + escapeHtml(b.status) + '</span>');
+                let statusBadge = '<span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-800 border border-slate-200">' + escapeHtml(b.status) + '</span>';
+                if (isPending) {
+                    statusBadge = '<span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">Pending Review</span>';
+                } else if (isAccepted) {
+                    statusBadge = '<span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">Confirmed & Accepted</span>';
+                } else if (isRescheduleProposed) {
+                    statusBadge = '<span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-800 border border-purple-200">Reschedule Proposed</span>';
+                }
 
                 html += `
-                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 hover:border-slate-300 transition">
+                    <div class="bg-white rounded-2xl border ${isRescheduleProposed ? 'border-purple-300 ring-2 ring-purple-100' : 'border-slate-200'} shadow-sm p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 hover:border-slate-300 transition">
                         <div class="flex items-start gap-4">
                             <div class="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold text-lg">
                                 🎓
@@ -215,6 +275,11 @@ $csrfToken = CsrfService::getToken();
                                     <span>•</span>
                                     <span class="font-mono text-[11px] text-slate-400">Ref: ${escapeHtml(b.booking_reference)}</span>
                                 </div>
+                                ${isRescheduleProposed ? `
+                                    <div class="mt-2 text-xs text-purple-800 bg-purple-50 p-2 rounded-lg border border-purple-200">
+                                        🔄 <strong>Reschedule Pending:</strong> Waiting for parent to accept proposed replacement slot.
+                                    </div>
+                                ` : ''}
                                 ${b.student_notes ? `<div class="mt-3 p-3 bg-slate-50 rounded-xl text-xs text-slate-700 leading-relaxed border border-slate-100">💬 <strong>Parent Note:</strong> ${escapeHtml(b.student_notes)}</div>` : ''}
                             </div>
                         </div>
@@ -225,16 +290,28 @@ $csrfToken = CsrfService::getToken();
                                 <div class="text-[11px] text-slate-400">£${Number(b.hourly_rate).toFixed(2)} / hr</div>
                             </div>
 
-                            ${isPending ? `
-                                <div class="flex items-center gap-2">
-                                    <button type="button" onclick="acceptBooking(${b.booking_id})" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm transition">
-                                        Accept Request
+                            <div class="flex flex-wrap items-center gap-2">
+                                ${isPending ? `
+                                    <button type="button" onclick="acceptBooking(${b.booking_id})" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm transition">
+                                        Accept
                                     </button>
-                                    <button type="button" onclick="openRejectModal(${b.booking_id})" class="px-4 py-2 border border-rose-200 text-rose-600 hover:bg-rose-50 font-bold text-xs rounded-xl transition">
+                                    <button type="button" onclick="openRejectModal(${b.booking_id})" class="px-3 py-2 border border-rose-200 text-rose-600 hover:bg-rose-50 font-bold text-xs rounded-xl transition">
                                         Decline
                                     </button>
-                                </div>
-                            ` : ''}
+                                ` : ''}
+
+                                ${canReschedule ? `
+                                    <button type="button" onclick="openRescheduleModal(${b.booking_id})" class="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl shadow-sm transition">
+                                        Propose Reschedule
+                                    </button>
+                                ` : ''}
+
+                                ${canCancel ? `
+                                    <button type="button" onclick="cancelBooking(${b.booking_id})" class="px-3 py-2 border border-rose-200 text-rose-600 hover:bg-rose-50 font-bold text-xs rounded-xl transition">
+                                        Cancel
+                                    </button>
+                                ` : ''}
+                            </div>
                         </div>
                     </div>
                 `;
@@ -251,7 +328,7 @@ $csrfToken = CsrfService::getToken();
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        csrf_token: '<?= $csrfToken ?>',
+                        csrf_token: csrfToken,
                         id: bookingId
                     })
                 });
@@ -292,7 +369,7 @@ $csrfToken = CsrfService::getToken();
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        csrf_token: '<?= $csrfToken ?>',
+                        csrf_token: csrfToken,
                         id: bookingId,
                         rejection_reason: reason
                     })
@@ -313,6 +390,109 @@ $csrfToken = CsrfService::getToken();
                 btn.textContent = 'Decline Request';
             }
         });
+
+        async function openRescheduleModal(bookingId) {
+            const booking = allBookings.find(b => b.booking_id == bookingId);
+            if (!booking) return;
+
+            document.getElementById('reschedule_booking_id').value = bookingId;
+            const infoDiv = document.getElementById('reschedule_booking_info');
+            infoDiv.innerHTML = `
+                <div><strong>Current Booking:</strong> ${escapeHtml(booking.subject_name)}</div>
+                <div><strong>Student:</strong> ${escapeHtml(booking.child_first_name || 'Self')} ${escapeHtml(booking.child_last_name || '')}</div>
+                <div><strong>Current Time:</strong> ${booking.scheduled_start} to ${booking.scheduled_end} (UK)</div>
+            `;
+
+            await loadAvailableSlots();
+            const select = document.getElementById('reschedule_slot_select');
+            select.innerHTML = '<option value="">-- Choose an open future slot --</option>';
+
+            if (availableSlots.length === 0) {
+                select.innerHTML += '<option disabled>No open slots available (create one in Availability page)</option>';
+            } else {
+                availableSlots.forEach(s => {
+                    const st = new Date(s.start_time.replace(' ', 'T'));
+                    const et = new Date(s.end_time.replace(' ', 'T'));
+                    const txt = `${st.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })} ${st.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })} – ${et.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })} (${s.session_type}, ${s.delivery_mode})`;
+                    select.innerHTML += `<option value="${s.id}">${txt}</option>`;
+                });
+            }
+
+            rescheduleModal.classList.remove('hidden');
+        }
+
+        function closeRescheduleModal() {
+            rescheduleModal.classList.add('hidden');
+        }
+
+        rescheduleForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('confirmRescheduleBtn');
+            btn.disabled = true;
+            btn.textContent = 'Sending...';
+
+            const bookingId = parseInt(document.getElementById('reschedule_booking_id').value, 10);
+            const slotId = parseInt(document.getElementById('reschedule_slot_select').value, 10);
+
+            if (!slotId) {
+                alert('Please select an available replacement slot.');
+                btn.disabled = false;
+                btn.textContent = 'Send Proposal';
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/bookings/reschedule-propose.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        csrf_token: csrfToken,
+                        id: bookingId,
+                        proposed_availability_slot_id: slotId
+                    })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    closeRescheduleModal();
+                    showAlert('Reschedule proposed successfully! Awaiting parent acceptance.', 'success');
+                    loadBookings();
+                } else {
+                    alert(data.message || 'Failed to propose reschedule');
+                }
+            } catch (err) {
+                alert('Network error while proposing reschedule.');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Send Proposal';
+            }
+        });
+
+        async function cancelBooking(bookingId) {
+            const reason = prompt('Are you sure you want to cancel this booking? Enter an optional cancellation note:');
+            if (reason === null) return;
+
+            try {
+                const res = await fetch('/api/bookings/cancel.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id: bookingId,
+                        cancellation_reason: reason,
+                        csrf_token: csrfToken
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showAlert('Booking cancelled and schedule freed.', 'success');
+                    loadBookings();
+                } else {
+                    showAlert(data.message || 'Failed to cancel booking', 'error');
+                }
+            } catch (err) {
+                showAlert('Network error while cancelling booking.', 'error');
+            }
+        }
 
         function showAlert(msg, type) {
             alertBox.textContent = msg;
