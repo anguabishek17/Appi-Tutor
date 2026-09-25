@@ -47,9 +47,22 @@ try {
             b.scheduled_start,
             b.scheduled_end,
             b.status,
-            tp.user_id AS tutor_user_id
+            tp.user_id AS tutor_user_id,
+            u_tutor.email AS tutor_email,
+            u_tutor.first_name AS tutor_first_name,
+            u_tutor.last_name AS tutor_last_name,
+            u_parent.email AS parent_email,
+            u_parent.first_name AS parent_first_name,
+            u_parent.last_name AS parent_last_name,
+            sc.first_name AS child_first_name,
+            sc.last_name AS child_last_name,
+            s.name AS subject_name
         FROM bookings b
         JOIN tutor_profiles tp ON b.tutor_profile_id = tp.id
+        JOIN users u_tutor ON tp.user_id = u_tutor.id
+        JOIN users u_parent ON b.parent_user_id = u_parent.id
+        LEFT JOIN students_children sc ON b.student_child_id = sc.id
+        JOIN subjects s ON b.subject_id = s.id
         WHERE b.id = :id
         FOR UPDATE
     ');
@@ -155,6 +168,41 @@ try {
     ]);
 
     $db->commit();
+
+    // Trigger Email Notification to opposing party (After Commit)
+    try {
+        if ($userRole === 'STUDENT_PARENT') {
+            // Notify Tutor
+            $tutorName = trim(($booking['tutor_first_name'] ?? '') . ' ' . ($booking['tutor_last_name'] ?? ''));
+            \App\Services\BookingNotificationService::notifyBookingCancelled(
+                [
+                    'id' => $bookingId,
+                    'booking_reference' => $booking['booking_reference'],
+                    'scheduled_start' => $booking['scheduled_start']
+                ],
+                $booking['tutor_email'],
+                $tutorName,
+                'Parent',
+                $reason
+            );
+        } else {
+            // Notify Parent
+            $parentName = trim(($booking['parent_first_name'] ?? '') . ' ' . ($booking['parent_last_name'] ?? ''));
+            \App\Services\BookingNotificationService::notifyBookingCancelled(
+                [
+                    'id' => $bookingId,
+                    'booking_reference' => $booking['booking_reference'],
+                    'scheduled_start' => $booking['scheduled_start']
+                ],
+                $booking['parent_email'],
+                $parentName,
+                'Tutor',
+                $reason
+            );
+        }
+    } catch (\Throwable $mailErr) {
+        error_log("[Booking Cancel Mail Error] " . $mailErr->getMessage());
+    }
 
     ResponseService::json([
         'booking_id' => $bookingId,

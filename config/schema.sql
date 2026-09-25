@@ -265,9 +265,23 @@ CREATE TABLE audit_logs (
     CONSTRAINT fk_audit_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE INDEX idx_audit_action ON audit_logs(action);
-CREATE INDEX idx_audit_entity ON audit_logs(entity_type, entity_id);
-CREATE INDEX idx_audit_created ON audit_logs(created_at);
+-- 14. Notification Logs table (Transactional email delivery logs)
+CREATE TABLE notification_logs (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    booking_id INT UNSIGNED NULL,
+    recipient_email VARCHAR(255) NOT NULL,
+    recipient_name VARCHAR(255) NULL,
+    event_type VARCHAR(100) NOT NULL,
+    subject VARCHAR(255) NOT NULL,
+    status ENUM('SENT', 'FAILED', 'DEV_LOGGED') NOT NULL DEFAULT 'SENT',
+    error_message TEXT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_notification_booking FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE INDEX idx_notification_booking ON notification_logs(booking_id);
+CREATE INDEX idx_notification_event ON notification_logs(event_type);
+CREATE INDEX idx_notification_status ON notification_logs(status);
 
 -- Initial Seed: AppiTutors Manager Account (role_id = 1 is MANAGER)
 INSERT INTO users (id, firebase_uid, role_id, email, first_name, last_name, phone, avatar_url, status)

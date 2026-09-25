@@ -50,8 +50,19 @@ try {
             b.proposed_reschedule_start,
             b.proposed_reschedule_end,
             b.hourly_rate,
-            b.total_amount
+            b.total_amount,
+            u_tutor.email AS tutor_email,
+            u_tutor.first_name AS tutor_first_name,
+            u_tutor.last_name AS tutor_last_name,
+            u_parent.first_name AS parent_first_name,
+            u_parent.last_name AS parent_last_name,
+            sc.first_name AS child_first_name,
+            sc.last_name AS child_last_name
         FROM bookings b
+        JOIN tutor_profiles tp ON b.tutor_profile_id = tp.id
+        JOIN users u_tutor ON tp.user_id = u_tutor.id
+        JOIN users u_parent ON b.parent_user_id = u_parent.id
+        LEFT JOIN students_children sc ON b.student_child_id = sc.id
         WHERE b.id = :id
         FOR UPDATE
     ');
@@ -256,6 +267,28 @@ try {
     ]);
 
     $db->commit();
+
+    // Trigger Email Notification (After Commit)
+    try {
+        $parentName = trim(($booking['parent_first_name'] ?? '') . ' ' . ($booking['parent_last_name'] ?? ''));
+        $tutorName = trim(($booking['tutor_first_name'] ?? '') . ' ' . ($booking['tutor_last_name'] ?? ''));
+        $childName = trim(($booking['child_first_name'] ?? 'Self') . ' ' . ($booking['child_last_name'] ?? ''));
+
+        \App\Services\BookingNotificationService::notifyRescheduleAccepted(
+            [
+                'id' => $bookingId,
+                'booking_reference' => $booking['booking_reference']
+            ],
+            $booking['tutor_email'],
+            $tutorName,
+            $parentName,
+            $childName,
+            $proposedSlot['start_time'],
+            $proposedSlot['end_time']
+        );
+    } catch (\Throwable $mailErr) {
+        error_log("[Reschedule Accept Mail Error] " . $mailErr->getMessage());
+    }
 
     ResponseService::json([
         'booking_id' => $bookingId,

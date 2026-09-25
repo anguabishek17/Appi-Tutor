@@ -48,8 +48,16 @@ try {
             b.status,
             b.proposed_availability_slot_id,
             b.proposed_reschedule_start,
-            b.proposed_reschedule_end
+            b.proposed_reschedule_end,
+            u_tutor.email AS tutor_email,
+            u_tutor.first_name AS tutor_first_name,
+            u_tutor.last_name AS tutor_last_name,
+            u_parent.first_name AS parent_first_name,
+            u_parent.last_name AS parent_last_name
         FROM bookings b
+        JOIN tutor_profiles tp ON b.tutor_profile_id = tp.id
+        JOIN users u_tutor ON tp.user_id = u_tutor.id
+        JOIN users u_parent ON b.parent_user_id = u_parent.id
         WHERE b.id = :id
         FOR UPDATE
     ');
@@ -114,6 +122,26 @@ try {
     ]);
 
     $db->commit();
+
+    // Trigger Email Notification (After Commit)
+    try {
+        $parentName = trim(($booking['parent_first_name'] ?? '') . ' ' . ($booking['parent_last_name'] ?? ''));
+        $tutorName = trim(($booking['tutor_first_name'] ?? '') . ' ' . ($booking['tutor_last_name'] ?? ''));
+
+        \App\Services\BookingNotificationService::notifyRescheduleDeclined(
+            [
+                'id' => $bookingId,
+                'booking_reference' => $booking['booking_reference'],
+                'scheduled_start' => $booking['scheduled_start'],
+                'scheduled_end' => $booking['scheduled_end']
+            ],
+            $booking['tutor_email'],
+            $tutorName,
+            $parentName
+        );
+    } catch (\Throwable $mailErr) {
+        error_log("[Reschedule Decline Mail Error] " . $mailErr->getMessage());
+    }
 
     ResponseService::json([
         'booking_id' => $bookingId,

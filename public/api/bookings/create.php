@@ -256,6 +256,36 @@ try {
     // 4. Commit Transaction
     $db->commit();
 
+    // 5. Transactional Email Notification (After Commit)
+    try {
+        $tutorEmailStmt = $db->prepare('SELECT u.email, u.first_name, u.last_name FROM users u JOIN tutor_profiles tp ON tp.user_id = u.id WHERE tp.id = :tpid LIMIT 1');
+        $tutorEmailStmt->execute([':tpid' => $tutorProfileId]);
+        $tutorUser = $tutorEmailStmt->fetch();
+
+        if ($tutorUser) {
+            $tutorName = trim($tutorUser['first_name'] . ' ' . $tutorUser['last_name']);
+            $parentName = trim(($parent['first_name'] ?? '') . ' ' . ($parent['last_name'] ?? ''));
+            $childName = trim($child['first_name'] . ' ' . $child['last_name']);
+
+            \App\Services\BookingNotificationService::notifyBookingCreated(
+                [
+                    'id' => $newBookingId,
+                    'booking_reference' => $bookingReference,
+                    'scheduled_start' => $slot['start_time'],
+                    'scheduled_end' => $slot['end_time'],
+                    'delivery_mode' => $slot['delivery_mode']
+                ],
+                $tutorUser['email'],
+                $tutorName,
+                $parentName,
+                $childName,
+                $subject['name']
+            );
+        }
+    } catch (\Throwable $mailErr) {
+        error_log("[Booking Create Mail Error] " . $mailErr->getMessage());
+    }
+
     ResponseService::json([
         'booking_id' => $newBookingId,
         'booking_reference' => $bookingReference,

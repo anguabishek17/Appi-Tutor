@@ -56,8 +56,21 @@ try {
             b.subject_id,
             b.scheduled_start,
             b.scheduled_end,
-            b.status
+            b.status,
+            u_tutor.first_name AS tutor_first_name,
+            u_tutor.last_name AS tutor_last_name,
+            u_parent.email AS parent_email,
+            u_parent.first_name AS parent_first_name,
+            u_parent.last_name AS parent_last_name,
+            sc.first_name AS child_first_name,
+            sc.last_name AS child_last_name,
+            s.name AS subject_name
         FROM bookings b
+        JOIN tutor_profiles tp ON b.tutor_profile_id = tp.id
+        JOIN users u_tutor ON tp.user_id = u_tutor.id
+        JOIN users u_parent ON b.parent_user_id = u_parent.id
+        LEFT JOIN students_children sc ON b.student_child_id = sc.id
+        JOIN subjects s ON b.subject_id = s.id
         WHERE b.id = :id
         FOR UPDATE
     ');
@@ -140,6 +153,31 @@ try {
     ]);
 
     $db->commit();
+
+    // Trigger Email Notification (After Commit)
+    try {
+        $parentName = trim(($booking['parent_first_name'] ?? '') . ' ' . ($booking['parent_last_name'] ?? ''));
+        $tutorName = trim(($booking['tutor_first_name'] ?? '') . ' ' . ($booking['tutor_last_name'] ?? ''));
+        $childName = trim(($booking['child_first_name'] ?? 'Self') . ' ' . ($booking['child_last_name'] ?? ''));
+        $subjectName = (string)($booking['subject_name'] ?? 'Lesson');
+
+        \App\Services\BookingNotificationService::notifyBookingRejected(
+            [
+                'id' => $bookingId,
+                'booking_reference' => $booking['booking_reference'],
+                'scheduled_start' => $booking['scheduled_start'],
+                'scheduled_end' => $booking['scheduled_end']
+            ],
+            $booking['parent_email'],
+            $parentName,
+            $tutorName,
+            $childName,
+            $subjectName,
+            $rejectionReason
+        );
+    } catch (\Throwable $mailErr) {
+        error_log("[Booking Reject Mail Error] " . $mailErr->getMessage());
+    }
 
     ResponseService::json([
         'booking_id' => $bookingId,

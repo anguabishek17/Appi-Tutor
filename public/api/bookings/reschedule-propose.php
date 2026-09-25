@@ -63,10 +63,16 @@ try {
             b.status,
             b.proposed_availability_slot_id,
             tp.approval_status,
-            u_tutor.status AS tutor_user_status
+            u_tutor.status AS tutor_user_status,
+            u_tutor.first_name AS tutor_first_name,
+            u_tutor.last_name AS tutor_last_name,
+            u_parent.email AS parent_email,
+            u_parent.first_name AS parent_first_name,
+            u_parent.last_name AS parent_last_name
         FROM bookings b
         JOIN tutor_profiles tp ON b.tutor_profile_id = tp.id
         JOIN users u_tutor ON tp.user_id = u_tutor.id
+        JOIN users u_parent ON b.parent_user_id = u_parent.id
         WHERE b.id = :id
         FOR UPDATE
     ');
@@ -239,6 +245,28 @@ try {
     ]);
 
     $db->commit();
+
+    // Trigger Email Notification (After Commit)
+    try {
+        $parentName = trim(($booking['parent_first_name'] ?? '') . ' ' . ($booking['parent_last_name'] ?? ''));
+        $tutorName = trim(($booking['tutor_first_name'] ?? '') . ' ' . ($booking['tutor_last_name'] ?? ''));
+
+        \App\Services\BookingNotificationService::notifyRescheduleProposed(
+            [
+                'id' => $bookingId,
+                'booking_reference' => $booking['booking_reference'],
+                'scheduled_start' => $booking['scheduled_start'],
+                'scheduled_end' => $booking['scheduled_end']
+            ],
+            $booking['parent_email'],
+            $parentName,
+            $tutorName,
+            $proposedSlot['start_time'],
+            $proposedSlot['end_time']
+        );
+    } catch (\Throwable $mailErr) {
+        error_log("[Reschedule Propose Mail Error] " . $mailErr->getMessage());
+    }
 
     ResponseService::json([
         'booking_id' => $bookingId,
