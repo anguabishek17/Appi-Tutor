@@ -26,6 +26,7 @@ $stmt = $db->prepare('
         b.hourly_rate,
         b.total_amount,
         b.student_notes,
+        b.rejection_reason,
         b.created_at,
         u_tutor.first_name AS tutor_first_name,
         u_tutor.last_name AS tutor_last_name,
@@ -107,12 +108,20 @@ $bookings = $stmt->fetchAll();
                 <?php foreach ($bookings as $b): 
                     $start = new DateTime($b['scheduled_start']);
                     $end = new DateTime($b['scheduled_end']);
+                    
                     $statusBadge = match($b['status']) {
                         'PENDING' => 'bg-amber-100 text-amber-800 border-amber-200',
                         'ACCEPTED' => 'bg-emerald-100 text-emerald-800 border-emerald-200',
                         'REJECTED' => 'bg-rose-100 text-rose-800 border-rose-200',
                         'CANCELLED' => 'bg-slate-100 text-slate-700 border-slate-200',
                         default => 'bg-indigo-100 text-indigo-800 border-indigo-200'
+                    };
+
+                    $statusNote = match($b['status']) {
+                        'PENDING' => '⏳ Waiting for tutor response',
+                        'ACCEPTED' => '✅ Booking accepted',
+                        'REJECTED' => '❌ Booking rejected' . (!empty($b['rejection_reason']) ? ': ' . $b['rejection_reason'] : ''),
+                        default => $b['status']
                     };
                 ?>
                     <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -139,6 +148,9 @@ $bookings = $stmt->fetchAll();
                                     <span>🕒 <?= $start->format('H:i') ?> – <?= $end->format('H:i') ?> (UK)</span>
                                     <span>•</span>
                                     <span class="font-mono text-[11px] text-slate-400">Ref: <?= htmlspecialchars($b['booking_reference']) ?></span>
+                                </div>
+                                <div class="mt-2 text-xs font-semibold <?= $b['status'] === 'ACCEPTED' ? 'text-emerald-700' : ($b['status'] === 'REJECTED' ? 'text-rose-700' : 'text-amber-700') ?>">
+                                    <?= htmlspecialchars($statusNote) ?>
                                 </div>
                             </div>
                         </div>

@@ -25,7 +25,9 @@ $tpStmt = $db->prepare('
         tp.qualifications,
         tp.teaching_mode,
         (SELECT COUNT(*) FROM tutor_subjects ts WHERE ts.tutor_profile_id = tp.id) AS subjects_count,
-        (SELECT COUNT(*) FROM availability_slots av WHERE av.tutor_profile_id = tp.id AND av.is_blocked = 0 AND av.start_time > NOW()) AS active_slots_count
+        (SELECT COUNT(*) FROM availability_slots av WHERE av.tutor_profile_id = tp.id AND av.is_blocked = 0 AND av.start_time > NOW()) AS active_slots_count,
+        (SELECT COUNT(*) FROM bookings b WHERE b.tutor_profile_id = tp.id AND b.status = "PENDING") AS pending_bookings_count,
+        (SELECT COUNT(*) FROM bookings b WHERE b.tutor_profile_id = tp.id AND b.status = "ACCEPTED" AND b.scheduled_start >= NOW()) AS upcoming_lessons_count
     FROM tutor_profiles tp
     WHERE tp.user_id = :uid
     LIMIT 1
@@ -36,6 +38,8 @@ $profile = $tpStmt->fetch() ?: [];
 $tutorProfileId = (int)($profile['tutor_profile_id'] ?? 0);
 $subjectsCount = (int)($profile['subjects_count'] ?? 0);
 $activeSlotsCount = (int)($profile['active_slots_count'] ?? 0);
+$pendingBookingsCount = (int)($profile['pending_bookings_count'] ?? 0);
+$upcomingLessonsCount = (int)($profile['upcoming_lessons_count'] ?? 0);
 ?>
 <!DOCTYPE html>
 <html lang="en" class="h-full bg-slate-50">
@@ -65,6 +69,12 @@ $activeSlotsCount = (int)($profile['active_slots_count'] ?? 0);
                     <a href="/tutor/profile.php" class="px-3 py-1.5 text-slate-600 hover:text-indigo-600 rounded-lg">Profile</a>
                     <a href="/tutor/subjects.php" class="px-3 py-1.5 text-slate-600 hover:text-indigo-600 rounded-lg">Subjects</a>
                     <a href="/tutor/availability.php" class="px-3 py-1.5 text-slate-600 hover:text-indigo-600 rounded-lg">Availability</a>
+                    <a href="/tutor/bookings.php" class="px-3 py-1.5 text-slate-600 hover:text-indigo-600 rounded-lg flex items-center gap-1.5">
+                        <span>Bookings</span>
+                        <?php if ($pendingBookingsCount > 0): ?>
+                            <span class="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-400 text-slate-900"><?= $pendingBookingsCount ?></span>
+                        <?php endif; ?>
+                    </a>
                 </nav>
             </div>
             <div class="flex items-center gap-4 text-sm font-semibold">
@@ -84,40 +94,54 @@ $activeSlotsCount = (int)($profile['active_slots_count'] ?? 0);
         </div>
 
         <!-- Metric Cards -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                <div class="text-xs font-bold text-slate-500 uppercase tracking-wider">Account Status</div>
-                <div class="mt-2 flex items-center gap-2">
-                    <span class="w-3 h-3 rounded-full bg-emerald-500"></span>
-                    <span class="text-lg font-bold text-slate-900">Verified & Approved</span>
+                <div class="text-xs font-bold text-slate-500 uppercase tracking-wider">Pending Requests</div>
+                <div class="mt-2 text-2xl font-extrabold <?= $pendingBookingsCount > 0 ? 'text-amber-600' : 'text-slate-900' ?>">
+                    <?= $pendingBookingsCount ?> Pending
                 </div>
-                <p class="text-xs text-slate-500 mt-2">Publicly visible and bookable in search.</p>
+                <p class="text-xs text-slate-500 mt-2"><a href="/tutor/bookings.php" class="text-indigo-600 hover:underline">Review requests &rarr;</a></p>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                <div class="text-xs font-bold text-slate-500 uppercase tracking-wider">Upcoming Lessons</div>
+                <div class="mt-2 text-2xl font-extrabold text-emerald-600"><?= $upcomingLessonsCount ?> Confirmed</div>
+                <p class="text-xs text-slate-500 mt-2"><a href="/tutor/bookings.php" class="text-indigo-600 hover:underline">View calendar &rarr;</a></p>
             </div>
 
             <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                 <div class="text-xs font-bold text-slate-500 uppercase tracking-wider">Teaching Subjects</div>
                 <div class="mt-2 text-2xl font-extrabold text-indigo-600"><?= $subjectsCount ?> Assigned</div>
-                <p class="text-xs text-slate-500 mt-2"><a href="/tutor/subjects.php" class="text-indigo-600 hover:underline">Manage selected subjects &rarr;</a></p>
+                <p class="text-xs text-slate-500 mt-2"><a href="/tutor/subjects.php" class="text-indigo-600 hover:underline">Manage subjects &rarr;</a></p>
             </div>
 
             <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                <div class="text-xs font-bold text-slate-500 uppercase tracking-wider">Active Availability Slots</div>
-                <div class="mt-2 text-2xl font-extrabold text-slate-900"><?= $activeSlotsCount ?> Open</div>
+                <div class="text-xs font-bold text-slate-500 uppercase tracking-wider">Open Slots</div>
+                <div class="mt-2 text-2xl font-extrabold text-slate-900"><?= $activeSlotsCount ?> Slots</div>
                 <p class="text-xs text-slate-500 mt-2"><a href="/tutor/availability.php" class="text-indigo-600 hover:underline">Manage schedule &rarr;</a></p>
             </div>
         </div>
 
         <!-- Quick Action Hub -->
         <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 mb-8">
-            <h2 class="text-lg font-bold text-slate-900 mb-4">Tutor Portal Actions</h2>
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <a href="/tutor/profile.php" class="p-5 rounded-xl border border-slate-200 hover:border-indigo-500 hover:bg-indigo-50/20 transition flex flex-col justify-between">
+            <h2 class="text-lg font-bold text-slate-900 mb-4">Tutor Operations Hub</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <a href="/tutor/bookings.php" class="p-5 rounded-xl border border-slate-200 hover:border-indigo-500 hover:bg-indigo-50/20 transition flex flex-col justify-between">
                     <div>
-                        <div class="text-2xl mb-2">👤</div>
-                        <div class="font-bold text-slate-900">Profile & Rates</div>
-                        <div class="text-xs text-slate-500 mt-1">Set headline, hourly rate (£<?= number_format((float)($profile['hourly_rate'] ?? 35), 2) ?>), bio, and qualifications.</div>
+                        <div class="text-2xl mb-2">📋</div>
+                        <div class="font-bold text-slate-900">Bookings & Requests</div>
+                        <div class="text-xs text-slate-500 mt-1">Accept or decline pending parent session requests.</div>
                     </div>
-                    <span class="text-indigo-600 font-bold text-xs mt-4">Edit Profile &rarr;</span>
+                    <span class="text-indigo-600 font-bold text-xs mt-4">Manage Bookings &rarr;</span>
+                </a>
+
+                <a href="/tutor/availability.php" class="p-5 rounded-xl border border-slate-200 hover:border-indigo-500 hover:bg-indigo-50/20 transition flex flex-col justify-between">
+                    <div>
+                        <div class="text-2xl mb-2">📅</div>
+                        <div class="font-bold text-slate-900">Calendar Slots</div>
+                        <div class="text-xs text-slate-500 mt-1">Add dated availability slots for 1-to-1 or group lessons.</div>
+                    </div>
+                    <span class="text-indigo-600 font-bold text-xs mt-4">Manage Slots &rarr;</span>
                 </a>
 
                 <a href="/tutor/subjects.php" class="p-5 rounded-xl border border-slate-200 hover:border-indigo-500 hover:bg-indigo-50/20 transition flex flex-col justify-between">
@@ -129,13 +153,13 @@ $activeSlotsCount = (int)($profile['active_slots_count'] ?? 0);
                     <span class="text-indigo-600 font-bold text-xs mt-4">Select Subjects &rarr;</span>
                 </a>
 
-                <a href="/tutor/availability.php" class="p-5 rounded-xl border border-slate-200 hover:border-indigo-500 hover:bg-indigo-50/20 transition flex flex-col justify-between">
+                <a href="/tutor/profile.php" class="p-5 rounded-xl border border-slate-200 hover:border-indigo-500 hover:bg-indigo-50/20 transition flex flex-col justify-between">
                     <div>
-                        <div class="text-2xl mb-2">📅</div>
-                        <div class="font-bold text-slate-900">Calendar Slots</div>
-                        <div class="text-xs text-slate-500 mt-1">Add dated availability slots for 1-to-1 or group sessions.</div>
+                        <div class="text-2xl mb-2">👤</div>
+                        <div class="font-bold text-slate-900">Profile & Rates</div>
+                        <div class="text-xs text-slate-500 mt-1">Set headline, hourly rate (£<?= number_format((float)($profile['hourly_rate'] ?? 35), 2) ?>), bio, and qualifications.</div>
                     </div>
-                    <span class="text-indigo-600 font-bold text-xs mt-4">Manage Slots &rarr;</span>
+                    <span class="text-indigo-600 font-bold text-xs mt-4">Edit Profile &rarr;</span>
                 </a>
             </div>
         </div>
