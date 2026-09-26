@@ -417,27 +417,27 @@ class UIHelper
         $navItems = [
             ['label' => 'Home', 'url' => '/', 'key' => 'home'],
             ['label' => 'Find a Tutor', 'url' => '/tutors.php', 'key' => 'find_tutors'],
-            ['label' => 'Subjects', 'url' => '/tutors.php', 'key' => 'subjects'],
+            ['label' => 'Subjects', 'url' => '/#subjects', 'key' => 'subjects'],
             ['label' => 'How It Works', 'url' => '/#how-it-works', 'key' => 'how_it_works'],
             ['label' => 'Become a Tutor', 'url' => '/register.php', 'key' => 'become_a_tutor'],
         ];
         ?>
-        <header class="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+        <header id="appiPublicHeader" class="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200/80 transition-all duration-200">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between">
                 <div class="flex items-center gap-8">
-                    <a href="/" class="flex items-center gap-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-xl" aria-label="AppiTutors Home">
-                        <div class="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-bold text-xl shadow-md shadow-indigo-200" aria-hidden="true">
+                    <a href="/" class="flex items-center gap-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-xl group" aria-label="AppiTutors Home">
+                        <div class="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-extrabold text-lg shadow-md shadow-indigo-600/20 group-hover:bg-indigo-700 transition" aria-hidden="true">
                             A
                         </div>
-                        <span class="text-2xl font-extrabold tracking-tight text-slate-900">Appi<span class="text-indigo-600">Tutors</span></span>
+                        <span class="text-xl font-extrabold tracking-tight text-slate-900">Appi<span class="text-indigo-600">Tutors</span></span>
                     </a>
 
                     <!-- Desktop Navigation Links -->
-                    <nav class="hidden md:flex items-center gap-6 text-sm font-semibold text-slate-600" aria-label="Main Navigation">
+                    <nav class="hidden md:flex items-center gap-1.5 text-sm font-semibold text-slate-600" aria-label="Main Navigation">
                         <?php foreach ($navItems as $item): ?>
                             <?php $isActive = ($activePage === $item['key']); ?>
                             <a href="<?= htmlspecialchars($item['url']) ?>" 
-                               class="transition hover:text-indigo-600 <?= $isActive ? 'text-indigo-600 font-bold' : '' ?>"
+                               class="px-3.5 py-1.5 rounded-lg transition-colors hover:text-indigo-600 hover:bg-slate-50 <?= $isActive ? 'text-indigo-600 font-bold bg-indigo-50/70' : '' ?>"
                                <?= $isActive ? 'aria-current="page"' : '' ?>>
                                 <?= htmlspecialchars($item['label']) ?>
                             </a>
@@ -448,15 +448,15 @@ class UIHelper
                 <!-- Right Side Actions (Desktop & Mobile) -->
                 <div class="flex items-center gap-3">
                     <?php if ($user): ?>
-                        <a href="/dashboard.php" class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm transition focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <a href="/dashboard.php" class="inline-flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-xs transition focus:outline-none focus:ring-2 focus:ring-indigo-500">
                             <span>My Dashboard</span>
-                            <span class="text-xs font-normal opacity-90">(<?= $fullName ?>)</span>
+                            <span class="text-xs font-normal opacity-90 hidden sm:inline">(<?= $fullName ?>)</span>
                         </a>
                     <?php else: ?>
-                        <a href="/login.php" class="text-sm font-semibold text-slate-700 hover:text-indigo-600 transition px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-lg">
+                        <a href="/login.php" class="text-sm font-semibold text-slate-700 hover:text-indigo-600 transition px-3.5 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-lg">
                             Log In
                         </a>
-                        <a href="/register.php" class="inline-flex items-center px-4 py-2 text-sm font-bold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <a href="/register.php" class="inline-flex items-center px-4.5 py-2 text-sm font-bold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 shadow-sm shadow-indigo-600/20 transition focus:outline-none focus:ring-2 focus:ring-indigo-500">
                             Get Started
                         </a>
                     <?php endif; ?>
@@ -475,11 +475,11 @@ class UIHelper
                 <?php foreach ($navItems as $item): ?>
                     <?php $isActive = ($activePage === $item['key']); ?>
                     <a href="<?= htmlspecialchars($item['url']) ?>" 
-                       class="block px-3 py-2 rounded-lg text-sm font-semibold <?= $isActive ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-slate-700 hover:bg-slate-50' ?>">
+                       class="block px-3 py-2.5 rounded-xl text-sm font-semibold <?= $isActive ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-slate-700 hover:bg-slate-50' ?>">
                         <?= htmlspecialchars($item['label']) ?>
                     </a>
                 <?php endforeach; ?>
-                <div class="pt-2 border-t border-slate-100 flex flex-col gap-2">
+                <div class="pt-3 border-t border-slate-100 flex flex-col gap-2">
                     <?php if (!$user): ?>
                         <a href="/login.php" class="text-center py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 hover:bg-slate-50">Log In</a>
                         <a href="/register.php" class="text-center py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-bold shadow-sm hover:bg-indigo-700">Get Started</a>
@@ -502,6 +502,16 @@ class UIHelper
                     }
                 }
             });
+            window.addEventListener('scroll', () => {
+                const header = document.getElementById('appiPublicHeader');
+                if (header) {
+                    if (window.scrollY > 15) {
+                        header.classList.add('shadow-xs');
+                    } else {
+                        header.classList.remove('shadow-xs');
+                    }
+                }
+            }, { passive: true });
         </script>
         <?php
     }
@@ -512,43 +522,59 @@ class UIHelper
     public static function renderPublicFooter(): void
     {
         ?>
-        <footer class="bg-slate-900 text-slate-400 py-12 border-t border-slate-800 mt-auto">
+        <footer class="bg-slate-900 text-slate-400 py-14 border-t border-slate-800 mt-auto">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-8 pb-10 border-b border-slate-800">
-                    <div class="space-y-3 md:col-span-2">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-10 pb-12 border-b border-slate-800">
+                    <div class="space-y-4 md:col-span-1">
                         <div class="flex items-center gap-3">
-                            <div class="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center text-white font-bold text-lg">A</div>
-                            <span class="text-xl font-bold text-white tracking-tight">Appi<span class="text-indigo-400">Tutors</span></span>
+                            <div class="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-bold text-base shadow-sm">A</div>
+                            <span class="text-xl font-extrabold text-white tracking-tight">Appi<span class="text-indigo-400">Tutors</span></span>
                         </div>
-                        <p class="text-xs text-slate-400 max-w-sm leading-relaxed">
-                            Premium UK tuition connecting parents and students with vetted, DBS-checked subject specialists across Primary, 11-Plus, GCSE, and A-Level curricula.
+                        <p class="text-xs text-slate-400 leading-relaxed">
+                            Helping families across the UK find trusted, DBS-verified subject specialists for 1-to-1 tuition, exam confidence, and measurable academic progress.
                         </p>
+                        <div class="inline-flex items-center gap-2 text-[11px] font-semibold text-emerald-400 bg-emerald-950/60 px-3 py-1 rounded-full border border-emerald-800/60">
+                            <span>✓</span> Enhanced DBS Verified Tutors
+                        </div>
                     </div>
+
                     <div>
-                        <h4 class="text-xs font-bold uppercase tracking-wider text-white mb-3">Tuition & Learning</h4>
-                        <ul class="space-y-2 text-xs">
-                            <li><a href="/tutors.php" class="hover:text-white transition">Find a Verified Tutor</a></li>
-                            <li><a href="/tutors.php?delivery_mode=ONLINE" class="hover:text-white transition">Online Lessons</a></li>
-                            <li><a href="/tutors.php?delivery_mode=IN_PERSON" class="hover:text-white transition">In-Person Lessons</a></li>
-                            <li><a href="/register.php" class="hover:text-white transition">Apply as a Tutor</a></li>
+                        <h4 class="text-xs font-bold uppercase tracking-wider text-white mb-3.5">Platform</h4>
+                        <ul class="space-y-2.5 text-xs">
+                            <li><a href="/tutors.php" class="hover:text-white transition">Find a Tutor</a></li>
+                            <li><a href="/#subjects" class="hover:text-white transition">Subjects & Curricula</a></li>
+                            <li><a href="/#how-it-works" class="hover:text-white transition">How It Works</a></li>
+                            <li><a href="/register.php" class="hover:text-white transition">Become a Tutor</a></li>
                         </ul>
                     </div>
+
                     <div>
-                        <h4 class="text-xs font-bold uppercase tracking-wider text-white mb-3">Curricula & Standards</h4>
-                        <ul class="space-y-2 text-xs">
-                            <li><span class="text-slate-300">GCSE & IGCSE Tuition</span></li>
-                            <li><span class="text-slate-300">A-Level & AS Subjects</span></li>
-                            <li><span class="text-slate-300">11+ Grammar Preparation</span></li>
-                            <li><span class="text-slate-300">Enhanced DBS Checked</span></li>
+                        <h4 class="text-xs font-bold uppercase tracking-wider text-white mb-3.5">Curricula & Standards</h4>
+                        <ul class="space-y-2.5 text-xs">
+                            <li><a href="/tutors.php" class="hover:text-white transition">GCSE & IGCSE Tuition</a></li>
+                            <li><a href="/tutors.php" class="hover:text-white transition">A-Level & AS Subjects</a></li>
+                            <li><a href="/tutors.php" class="hover:text-white transition">11-Plus & Entrance Exams</a></li>
+                            <li><a href="/tutors.php" class="hover:text-white transition">Online & In-Person Sessions</a></li>
+                        </ul>
+                    </div>
+
+                    <div>
+                        <h4 class="text-xs font-bold uppercase tracking-wider text-white mb-3.5">Account & Portals</h4>
+                        <ul class="space-y-2.5 text-xs">
+                            <li><a href="/login.php" class="hover:text-white transition">Log In to Portal</a></li>
+                            <li><a href="/register.php" class="hover:text-white transition">Parent / Student Registration</a></li>
+                            <li><a href="/register.php" class="hover:text-white transition">Tutor Application</a></li>
+                            <li><a href="/login.php" class="hover:text-white transition">Manager Sign-in</a></li>
                         </ul>
                     </div>
                 </div>
+
                 <div class="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
                     <div>© <?= date('Y') ?> AppiTutors Ltd. UK Registered Tutoring Platform. All rights reserved.</div>
-                    <div class="flex items-center gap-4 text-slate-400">
+                    <div class="flex items-center gap-3 text-slate-400 text-xs">
                         <span>Europe/London (UK)</span>
                         <span>•</span>
-                        <span>Official MVP Presentation Ready</span>
+                        <span>DBS Verified Network</span>
                     </div>
                 </div>
             </div>
