@@ -28,7 +28,8 @@
 
         register: async function (email, password, firstName, lastName, role) {
             if (!this.isConfigured()) {
-                throw new Error('Firebase Authentication is not yet configured with valid credentials in .env. Please update FIREBASE_API_KEY, FIREBASE_AUTH_DOMAIN, and FIREBASE_PROJECT_ID.');
+                console.warn('[AppiTutors] Registration attempted without live Firebase credentials configured.');
+                throw new Error('Registration is temporarily unavailable. Please try again shortly.');
             }
 
             // 1. Create User in Firebase
