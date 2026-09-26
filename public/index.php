@@ -38,32 +38,38 @@ $heroTutor = $heroTutorStmt->fetch();
 $heroSubjects = [];
 $heroSlots = [];
 if ($heroTutor) {
-    // Fetch top 3 subjects for hero tutor
-    $hSubjStmt = $db->prepare('
-        SELECT s.name, c.code AS curriculum_code
-        FROM tutor_subjects ts
-        JOIN subjects s ON ts.subject_id = s.id
-        JOIN curricula c ON s.curriculum_id = c.id
-        WHERE ts.tutor_profile_id = :tpid
-        ORDER BY c.id ASC, s.name ASC
-        LIMIT 3
-    ');
-    $hSubjStmt->execute([':tpid' => $heroTutor['tutor_profile_id']]);
-    $heroSubjects = $hSubjStmt->fetchAll();
+    try {
+        // Fetch top 3 subjects for hero tutor
+        $hSubjStmt = $db->prepare('
+            SELECT s.name, c.code AS curriculum_code
+            FROM tutor_subjects ts
+            JOIN subjects s ON ts.subject_id = s.id
+            JOIN curricula c ON s.curriculum_id = c.id
+            WHERE ts.tutor_profile_id = :tpid
+            ORDER BY c.id ASC, s.name ASC
+            LIMIT 3
+        ');
+        $hSubjStmt->execute([':tpid' => $heroTutor['tutor_profile_id']]);
+        $heroSubjects = $hSubjStmt->fetchAll();
 
-    // Fetch next upcoming available slot
-    $hSlotStmt = $db->prepare('
-        SELECT start_time, end_time, delivery_mode
-        FROM tutor_availability
-        WHERE tutor_profile_id = :tpid 
-          AND status = "AVAILABLE" 
-          AND start_time > NOW()
-          AND booked_count < max_capacity
-        ORDER BY start_time ASC
-        LIMIT 1
-    ');
-    $hSlotStmt->execute([':tpid' => $heroTutor['tutor_profile_id']]);
-    $heroSlots = $hSlotStmt->fetch();
+        // Fetch next upcoming available slot from availability_slots
+        $hSlotStmt = $db->prepare('
+            SELECT start_time, end_time, delivery_mode
+            FROM availability_slots
+            WHERE tutor_profile_id = :tpid 
+              AND is_blocked = 0
+              AND start_time > NOW()
+              AND booked_count < max_capacity
+            ORDER BY start_time ASC
+            LIMIT 1
+        ');
+        $hSlotStmt->execute([':tpid' => $heroTutor['tutor_profile_id']]);
+        $heroSlots = $hSlotStmt->fetch();
+    } catch (\Throwable $e) {
+        error_log('[AppiTutors] Error loading hero tutor preview details: ' . $e->getMessage());
+        $heroSubjects = [];
+        $heroSlots = [];
+    }
 }
 
 // Fetch all featured tutors for "Meet our tutors" section
