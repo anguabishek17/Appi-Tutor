@@ -10,6 +10,8 @@ use App\Middleware\AuthMiddleware;
 use App\Database\Connection;
 use App\Services\CsrfService;
 
+use App\Services\UIHelper;
+
 // Require APPROVED tutor status
 $user = AuthMiddleware::requireApprovedTutor();
 $csrfToken = CsrfService::getToken();
@@ -30,36 +32,17 @@ $minDate = (new DateTimeImmutable('now', $tz))->modify('+24 hours')->format('Y-m
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>body { font-family: 'Plus Jakarta Sans', sans-serif; }</style>
 </head>
-<body class="min-h-full flex flex-col justify-between text-slate-800">
+<body class="min-h-full flex flex-col justify-between text-slate-800 antialiased selection:bg-indigo-500 selection:text-white">
 
-    <header class="bg-white border-b border-slate-200 sticky top-0 z-30">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-            <div class="flex items-center gap-6">
-                <a href="/tutor/dashboard.php" class="flex items-center gap-3">
-                    <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold">A</div>
-                    <span class="text-xl font-bold text-slate-900">Appi<span class="text-indigo-600">Tutors</span></span>
-                </a>
-                <nav class="hidden md:flex items-center gap-2 text-sm font-semibold">
-                    <a href="/tutor/dashboard.php" class="px-3 py-1.5 text-slate-600 hover:text-indigo-600 rounded-lg">Overview</a>
-                    <a href="/tutor/profile.php" class="px-3 py-1.5 text-slate-600 hover:text-indigo-600 rounded-lg">Profile</a>
-                    <a href="/tutor/subjects.php" class="px-3 py-1.5 text-slate-600 hover:text-indigo-600 rounded-lg">Subjects</a>
-                    <a href="/tutor/availability.php" class="px-3 py-1.5 text-indigo-600 bg-indigo-50 rounded-lg">Availability</a>
-                </nav>
-            </div>
-            <div class="flex items-center gap-4 text-sm font-semibold">
-                <span class="text-slate-600"><?= htmlspecialchars($user['first_name'] . ' ' . $user['last_name']) ?></span>
-                <a href="/logout.php" class="text-rose-600 hover:text-rose-700">Sign out</a>
-            </div>
-        </div>
-    </header>
+    <?= UIHelper::renderHeader($user, 'Availability') ?>
 
     <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
         <div class="mb-6">
-            <h1 class="text-2xl font-extrabold text-slate-900">Availability & Lesson Schedule</h1>
-            <p class="text-slate-600 text-sm mt-1">Create specific dated availability slots when you are available for ONE_TO_ONE or GROUP tuition sessions. All times in London (UK) timezone.</p>
+            <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">Availability & Lesson Schedule</h1>
+            <p class="text-slate-600 text-sm mt-1">Create specific dated availability slots when you are available for 1-to-1 or group tuition sessions. All times in UK (Europe/London) timezone.</p>
         </div>
 
-        <div id="alertBox" class="hidden mb-6 p-4 rounded-xl text-sm font-medium"></div>
+        <div id="alertBox" class="hidden mb-6 p-4 rounded-2xl text-sm font-medium"></div>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <!-- Left: Add New Slot Form -->
@@ -140,9 +123,8 @@ $minDate = (new DateTimeImmutable('now', $tz))->modify('+24 hours')->format('Y-m
         </div>
     </main>
 
-    <footer class="text-center py-6 text-xs text-slate-500 border-t border-slate-200 bg-white">
-        © <?= date('Y') ?> AppiTutors Ltd.
-    </footer>
+    <?= UIHelper::renderFooter() ?>
+    <?= UIHelper::renderConfirmationModal() ?>
 
     <script>
         const sessionTypeSelect = document.getElementById('session_type');
@@ -322,7 +304,13 @@ $minDate = (new DateTimeImmutable('now', $tz))->modify('+24 hours')->format('Y-m
         }
 
         async function deleteSlot(slotId) {
-            if (!confirm('Are you sure you want to delete this availability slot?')) return;
+            const confirmed = await window.AppiConfirm.show({
+                title: 'Delete Availability Slot',
+                message: 'Are you sure you want to delete this availability slot? Parents will no longer be able to book this session.',
+                confirmText: 'Delete Slot',
+                isDestructive: true
+            });
+            if (!confirmed) return;
 
             try {
                 const res = await fetch('/api/tutor/availability.php', {

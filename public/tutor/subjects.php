@@ -10,6 +10,8 @@ use App\Middleware\AuthMiddleware;
 use App\Database\Connection;
 use App\Services\CsrfService;
 
+use App\Services\UIHelper;
+
 // Require APPROVED tutor status
 $user = AuthMiddleware::requireApprovedTutor();
 $csrfToken = CsrfService::getToken();
@@ -26,33 +28,14 @@ $csrfToken = CsrfService::getToken();
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>body { font-family: 'Plus Jakarta Sans', sans-serif; }</style>
 </head>
-<body class="min-h-full flex flex-col justify-between text-slate-800">
+<body class="min-h-full flex flex-col justify-between text-slate-800 antialiased selection:bg-indigo-500 selection:text-white">
 
-    <header class="bg-white border-b border-slate-200 sticky top-0 z-30">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-            <div class="flex items-center gap-6">
-                <a href="/tutor/dashboard.php" class="flex items-center gap-3">
-                    <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold">A</div>
-                    <span class="text-xl font-bold text-slate-900">Appi<span class="text-indigo-600">Tutors</span></span>
-                </a>
-                <nav class="hidden md:flex items-center gap-2 text-sm font-semibold">
-                    <a href="/tutor/dashboard.php" class="px-3 py-1.5 text-slate-600 hover:text-indigo-600 rounded-lg">Overview</a>
-                    <a href="/tutor/profile.php" class="px-3 py-1.5 text-slate-600 hover:text-indigo-600 rounded-lg">Profile</a>
-                    <a href="/tutor/subjects.php" class="px-3 py-1.5 text-indigo-600 bg-indigo-50 rounded-lg">Subjects</a>
-                    <a href="/tutor/availability.php" class="px-3 py-1.5 text-slate-600 hover:text-indigo-600 rounded-lg">Availability</a>
-                </nav>
-            </div>
-            <div class="flex items-center gap-4 text-sm font-semibold">
-                <span class="text-slate-600"><?= htmlspecialchars($user['first_name'] . ' ' . $user['last_name']) ?></span>
-                <a href="/logout.php" class="text-rose-600 hover:text-rose-700">Sign out</a>
-            </div>
-        </div>
-    </header>
+    <?= UIHelper::renderHeader($user, 'Subjects') ?>
 
     <main class="flex-grow max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
             <div>
-                <h1 class="text-2xl font-extrabold text-slate-900">Teaching Subjects</h1>
+                <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">Teaching Subjects</h1>
                 <p class="text-slate-600 text-sm mt-1">Select the UK curricula and subjects you are qualified and enthusiastic to teach.</p>
             </div>
             <button type="button" id="saveSubjectsTopBtn" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl shadow-md transition flex items-center gap-2">
@@ -60,7 +43,7 @@ $csrfToken = CsrfService::getToken();
             </button>
         </div>
 
-        <div id="alertBox" class="hidden mb-6 p-4 rounded-xl text-sm font-medium"></div>
+        <div id="alertBox" class="hidden mb-6 p-4 rounded-2xl text-sm font-medium"></div>
 
         <!-- Selected Summary Badge Bar -->
         <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 mb-6 flex flex-wrap items-center justify-between gap-3">
@@ -87,9 +70,8 @@ $csrfToken = CsrfService::getToken();
         </div>
     </main>
 
-    <footer class="text-center py-6 text-xs text-slate-500 border-t border-slate-200 bg-white">
-        © <?= date('Y') ?> AppiTutors Ltd.
-    </footer>
+    <?= UIHelper::renderFooter() ?>
+    <?= UIHelper::renderConfirmationModal() ?>
 
     <script>
         let selectedSubjectIds = new Set();

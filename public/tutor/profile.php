@@ -10,6 +10,8 @@ use App\Middleware\AuthMiddleware;
 use App\Database\Connection;
 use App\Services\CsrfService;
 
+use App\Services\UIHelper;
+
 // Require APPROVED tutor status
 $user = AuthMiddleware::requireApprovedTutor();
 $db = Connection::getInstance();
@@ -50,38 +52,26 @@ $csrfToken = CsrfService::getToken();
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>body { font-family: 'Plus Jakarta Sans', sans-serif; }</style>
 </head>
-<body class="min-h-full flex flex-col justify-between text-slate-800">
+<body class="min-h-full flex flex-col justify-between text-slate-800 antialiased selection:bg-indigo-500 selection:text-white">
 
-    <header class="bg-white border-b border-slate-200 sticky top-0 z-30">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-            <div class="flex items-center gap-6">
-                <a href="/tutor/dashboard.php" class="flex items-center gap-3">
-                    <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold">A</div>
-                    <span class="text-xl font-bold text-slate-900">Appi<span class="text-indigo-600">Tutors</span></span>
-                </a>
-                <nav class="hidden md:flex items-center gap-2 text-sm font-semibold">
-                    <a href="/tutor/dashboard.php" class="px-3 py-1.5 text-slate-600 hover:text-indigo-600 rounded-lg">Overview</a>
-                    <a href="/tutor/profile.php" class="px-3 py-1.5 text-indigo-600 bg-indigo-50 rounded-lg">Profile</a>
-                    <a href="/tutor/subjects.php" class="px-3 py-1.5 text-slate-600 hover:text-indigo-600 rounded-lg">Subjects</a>
-                    <a href="/tutor/availability.php" class="px-3 py-1.5 text-slate-600 hover:text-indigo-600 rounded-lg">Availability</a>
-                </nav>
-            </div>
-            <div class="flex items-center gap-4 text-sm font-semibold">
-                <a href="/tutor.php?id=<?= (int)($profile['tutor_profile_id'] ?? 0) ?>" target="_blank" class="text-xs text-indigo-600 hover:underline">Preview Public Profile ↗</a>
-                <span class="text-slate-600"><?= htmlspecialchars($user['first_name'] . ' ' . $user['last_name']) ?></span>
-                <a href="/logout.php" class="text-rose-600 hover:text-rose-700">Sign out</a>
-            </div>
-        </div>
-    </header>
+    <?= UIHelper::renderHeader($user, 'Profile') ?>
 
     <main class="flex-grow max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
         <!-- Breadcrumb / Header -->
-        <div class="mb-6">
-            <h1 class="text-2xl font-extrabold text-slate-900">Tutor Profile Settings</h1>
-            <p class="text-slate-600 text-sm mt-1">Complete your professional credentials so parents and students can learn about your tutoring style.</p>
+        <div class="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+                <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">Tutor Profile Settings</h1>
+                <p class="text-slate-600 text-sm mt-1">Complete your professional credentials so parents and students can learn about your tutoring style.</p>
+            </div>
+            <?php if (!empty($profile['tutor_profile_id'])): ?>
+                <a href="/tutor.php?id=<?= (int)$profile['tutor_profile_id'] ?>" target="_blank" class="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 px-3.5 py-2 rounded-xl border border-indigo-100 transition self-start sm:self-auto">
+                    <span>Preview Public Profile</span>
+                    <span>↗</span>
+                </a>
+            <?php endif; ?>
         </div>
 
-        <div id="alertBox" class="hidden mb-6 p-4 rounded-xl text-sm font-medium"></div>
+        <div id="alertBox" class="hidden mb-6 p-4 rounded-2xl text-sm font-medium"></div>
 
         <form id="profileForm" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8 space-y-6">
             <?= CsrfService::field() ?>
@@ -173,9 +163,7 @@ $csrfToken = CsrfService::getToken();
         </form>
     </main>
 
-    <footer class="text-center py-6 text-xs text-slate-500 border-t border-slate-200 bg-white">
-        © <?= date('Y') ?> AppiTutors Ltd.
-    </footer>
+    <?= UIHelper::renderFooter() ?>
 
     <script>
         const form = document.getElementById('profileForm');

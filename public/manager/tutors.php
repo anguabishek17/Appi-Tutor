@@ -11,6 +11,8 @@ use App\Middleware\AuthMiddleware;
 use App\Database\Connection;
 use App\Services\CsrfService;
 
+use App\Services\UIHelper;
+
 // Require MANAGER role
 $user = AuthMiddleware::requireRole(['MANAGER']);
 
@@ -75,41 +77,17 @@ $processedTutors = $processedStmt->fetchAll();
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>body { font-family: 'Plus Jakarta Sans', sans-serif; }</style>
 </head>
-<body class="min-h-full flex flex-col justify-between text-slate-800">
+<body class="min-h-full flex flex-col justify-between text-slate-800 antialiased selection:bg-indigo-500 selection:text-white">
 
-    <header class="bg-slate-900 text-white border-b border-slate-800">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-            <div class="flex items-center gap-6">
-                <a href="/manager/dashboard.php" class="flex items-center gap-3">
-                    <div class="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center text-white font-bold">
-                        A
-                    </div>
-                    <span class="text-xl font-bold">Appi<span class="text-indigo-400">Tutors</span> <span class="text-xs ml-2 px-2 py-0.5 rounded bg-indigo-900 text-indigo-200 font-mono">MANAGER</span></span>
-                </a>
-                <nav class="hidden md:flex items-center gap-4 text-sm font-medium text-slate-300">
-                    <a href="/manager/dashboard.php" class="hover:text-white transition px-3 py-1.5 rounded-lg">Overview</a>
-                    <a href="/manager/tutors.php" class="text-white bg-slate-800 px-3 py-1.5 rounded-lg flex items-center gap-2">
-                        Tutor Approvals
-                        <span id="pendingBadge" class="bg-amber-500 text-slate-900 text-xs px-2 py-0.5 rounded-full font-bold <?= count($pendingTutors) === 0 ? 'hidden' : '' ?>">
-                            <?= count($pendingTutors) ?>
-                        </span>
-                    </a>
-                </nav>
-            </div>
-            <div class="flex items-center gap-4 text-sm font-semibold">
-                <span class="text-slate-300"><?= htmlspecialchars($user['first_name'] . ' ' . $user['last_name']) ?></span>
-                <a href="/logout.php" class="text-rose-400 hover:text-rose-300">Sign out</a>
-            </div>
-        </div>
-    </header>
+    <?= UIHelper::renderHeader($user, 'Tutor Approvals') ?>
 
     <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
         <div class="mb-8">
-            <h1 class="text-2xl font-extrabold text-slate-900">Tutor Verification & Approval Queue</h1>
-            <p class="text-slate-600 mt-1">Review tutor credentials, verify DBS status, and grant platform access.</p>
+            <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">Tutor Verification & Approval Queue</h1>
+            <p class="text-slate-600 mt-1 text-sm">Review tutor credentials, verify qualifications and DBS status, and grant teaching access.</p>
         </div>
 
-        <div id="toastNotification" class="hidden mb-6 p-4 rounded-xl text-sm"></div>
+        <div id="toastNotification" class="hidden mb-6 p-4 rounded-2xl text-sm font-medium"></div>
 
         <!-- Pending Applications Section -->
         <section class="mb-12">
@@ -203,18 +181,10 @@ $processedTutors = $processedStmt->fetchAll();
                                             <div class="text-xs text-slate-400 font-normal"><?= htmlspecialchars($p['email']) ?></div>
                                         </td>
                                         <td class="py-4 px-6">
-                                            <?php if ($p['approval_status'] === 'APPROVED'): ?>
-                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
-                                                    APPROVED
-                                                </span>
-                                            <?php else: ?>
-                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-100 text-rose-800">
-                                                    REJECTED
-                                                </span>
-                                            <?php endif; ?>
+                                            <?= UIHelper::renderTutorApprovalBadge($p['approval_status']) ?>
                                         </td>
-                                        <td class="py-4 px-6 text-slate-500 text-xs">
-                                            <?= date('d M Y, H:i', strtotime($p['updated_at'])) ?>
+                                        <td class="py-4 px-6 text-slate-500 text-xs font-medium">
+                                            <?= UIHelper::formatDateTime($p['updated_at']) ?>
                                         </td>
                                         <td class="py-4 px-6 text-slate-500 text-xs">
                                             <?= htmlspecialchars($p['approval_notes'] ?? '—') ?>
@@ -229,25 +199,51 @@ $processedTutors = $processedStmt->fetchAll();
         </section>
     </main>
 
-    <footer class="text-center py-6 text-xs text-slate-500 border-t border-slate-200 bg-white">
-        © <?= date('Y') ?> AppiTutors Platform Management.
-    </footer>
+    <!-- Reject Modal with Reason Input -->
+    <div id="rejectTutorModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs hidden">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in duration-150">
+            <h3 class="text-lg font-bold text-slate-900 mb-1">Reject Tutor Application</h3>
+            <p class="text-xs text-slate-500 mb-4">Please specify a reason or feedback for rejecting this tutor application.</p>
+            <input type="hidden" id="rejectTutorId">
+            <div class="mb-4">
+                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Reason for Rejection *</label>
+                <textarea id="rejectReasonInput" rows="3" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-rose-500 focus:outline-none" placeholder="e.g. Qualifications could not be verified with university records."></textarea>
+            </div>
+            <div class="flex items-center justify-end gap-3">
+                <button type="button" onclick="closeRejectModal()" class="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition">Cancel</button>
+                <button type="button" onclick="submitRejectTutor()" class="px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl transition shadow-md">Confirm Rejection</button>
+            </div>
+        </div>
+    </div>
+
+    <?= UIHelper::renderFooter() ?>
+    <?= UIHelper::renderConfirmationModal() ?>
 
     <script>
         const csrfToken = "<?= htmlspecialchars($csrfToken) ?>";
         const toast = document.getElementById('toastNotification');
+        const rejectModal = document.getElementById('rejectTutorModal');
+        const rejectIdInput = document.getElementById('rejectTutorId');
+        const rejectReasonInput = document.getElementById('rejectReasonInput');
 
         function showToast(msg, isSuccess = true) {
             toast.className = isSuccess 
-                ? 'mb-6 p-4 rounded-xl text-sm bg-emerald-50 text-emerald-800 border border-emerald-200'
-                : 'mb-6 p-4 rounded-xl text-sm bg-rose-50 text-rose-800 border border-rose-200';
+                ? 'mb-6 p-4 rounded-2xl text-sm font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-xs'
+                : 'mb-6 p-4 rounded-2xl text-sm font-semibold bg-rose-50 text-rose-800 border border-rose-200 shadow-xs';
             toast.innerHTML = msg;
             toast.classList.remove('hidden');
             setTimeout(() => { toast.classList.add('hidden'); }, 4000);
         }
 
         async function approveTutor(id) {
-            if (!confirm('Are you sure you want to approve this tutor?')) return;
+            const confirmed = await window.AppiConfirm.show({
+                title: 'Approve Tutor Application',
+                message: 'Are you sure you want to approve this tutor? They will immediately be granted access to create availability slots and receive student bookings.',
+                confirmText: 'Approve Tutor',
+                isDestructive: false
+            });
+            if (!confirmed) return;
+
             try {
                 const res = await fetch(`/api/manager/tutors/approve.php?id=${id}`, {
                     method: 'POST',
@@ -270,9 +266,23 @@ $processedTutors = $processedStmt->fetchAll();
             }
         }
 
-        async function rejectTutor(id) {
-            const reason = prompt('Please enter a reason for rejection (optional):', 'Qualifications could not be verified');
-            if (reason === null) return;
+        function rejectTutor(id) {
+            rejectIdInput.value = id;
+            rejectReasonInput.value = 'Qualifications or DBS credentials could not be verified.';
+            rejectModal.classList.remove('hidden');
+        }
+
+        function closeRejectModal() {
+            rejectModal.classList.add('hidden');
+        }
+
+        async function submitRejectTutor() {
+            const id = rejectIdInput.value;
+            const reason = rejectReasonInput.value.trim();
+            if (!reason) {
+                alert('Please provide a reason.');
+                return;
+            }
 
             try {
                 const res = await fetch(`/api/manager/tutors/reject.php?id=${id}`, {
@@ -285,6 +295,7 @@ $processedTutors = $processedStmt->fetchAll();
                 });
                 const data = await res.json();
                 if (data.success) {
+                    closeRejectModal();
                     showToast('Tutor rejected.');
                     const card = document.getElementById(`tutor-card-${id}`);
                     if (card) card.remove();
