@@ -9,6 +9,8 @@ require_once __DIR__ . '/../src/bootstrap.php';
 use App\Auth\AuthService;
 use App\Database\Connection;
 
+use App\Services\UIHelper;
+
 $user = AuthService::user();
 $db = Connection::getInstance();
 
@@ -34,33 +36,9 @@ $subjects = $subjectsStmt->fetchAll();
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>body { font-family: 'Plus Jakarta Sans', sans-serif; }</style>
 </head>
-<body class="min-h-screen flex flex-col justify-between text-slate-800">
+<body class="min-h-screen flex flex-col justify-between text-slate-800 antialiased selection:bg-indigo-500 selection:text-white">
 
-    <!-- Header Navigation -->
-    <header class="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-            <a href="/" class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-bold text-xl shadow-md shadow-indigo-200">A</div>
-                <span class="text-2xl font-extrabold tracking-tight text-slate-900">Appi<span class="text-indigo-600">Tutors</span></span>
-            </a>
-
-            <nav class="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-600">
-                <a href="/tutors.php" class="text-indigo-600">Find a Tutor</a>
-                <a href="/become-a-tutor.php" class="hover:text-indigo-600 transition">Become a Tutor</a>
-            </nav>
-
-            <div class="flex items-center gap-4">
-                <?php if ($user): ?>
-                    <a href="/dashboard.php" class="inline-flex items-center px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 shadow-sm transition">
-                        Dashboard (<?= htmlspecialchars($user['first_name']) ?>)
-                    </a>
-                <?php else: ?>
-                    <a href="/login.php" class="text-sm font-semibold text-slate-700 hover:text-indigo-600 transition px-3 py-2">Log In</a>
-                    <a href="/register.php" class="inline-flex items-center px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 shadow-sm transition">Get Started</a>
-                <?php endif; ?>
-            </div>
-        </div>
-    </header>
+    <?= UIHelper::renderPublicHeader($user, 'find_tutors') ?>
 
     <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
         <!-- Search Header -->
@@ -124,15 +102,7 @@ $subjects = $subjectsStmt->fetchAll();
         </div>
     </main>
 
-    <footer class="bg-slate-900 text-slate-400 py-12 border-t border-slate-800 mt-16">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-6">
-            <div class="flex items-center gap-3">
-                <div class="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center text-white font-bold text-lg">A</div>
-                <span class="text-xl font-bold text-white">Appi<span class="text-indigo-400">Tutors</span></span>
-            </div>
-            <p class="text-sm">© <?= date('Y') ?> AppiTutors Ltd. All rights reserved.</p>
-        </div>
-    </footer>
+    <?= UIHelper::renderPublicFooter() ?>
 
     <script>
         const tutorsGrid = document.getElementById('tutorsGrid');

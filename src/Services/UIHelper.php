@@ -409,6 +409,154 @@ class UIHelper
     }
 
     /**
+     * Render Accessible Public Header
+     */
+    public static function renderPublicHeader(?array $user = null, string $activePage = 'home'): void
+    {
+        $fullName = $user ? htmlspecialchars(trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? ''))) : '';
+        $navItems = [
+            ['label' => 'Home', 'url' => '/', 'key' => 'home'],
+            ['label' => 'Find a Tutor', 'url' => '/tutors.php', 'key' => 'find_tutors'],
+            ['label' => 'Subjects', 'url' => '/tutors.php', 'key' => 'subjects'],
+            ['label' => 'How It Works', 'url' => '/#how-it-works', 'key' => 'how_it_works'],
+            ['label' => 'Become a Tutor', 'url' => '/register.php', 'key' => 'become_a_tutor'],
+        ];
+        ?>
+        <header class="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+                <div class="flex items-center gap-8">
+                    <a href="/" class="flex items-center gap-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-xl" aria-label="AppiTutors Home">
+                        <div class="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-bold text-xl shadow-md shadow-indigo-200" aria-hidden="true">
+                            A
+                        </div>
+                        <span class="text-2xl font-extrabold tracking-tight text-slate-900">Appi<span class="text-indigo-600">Tutors</span></span>
+                    </a>
+
+                    <!-- Desktop Navigation Links -->
+                    <nav class="hidden md:flex items-center gap-6 text-sm font-semibold text-slate-600" aria-label="Main Navigation">
+                        <?php foreach ($navItems as $item): ?>
+                            <?php $isActive = ($activePage === $item['key']); ?>
+                            <a href="<?= htmlspecialchars($item['url']) ?>" 
+                               class="transition hover:text-indigo-600 <?= $isActive ? 'text-indigo-600 font-bold' : '' ?>"
+                               <?= $isActive ? 'aria-current="page"' : '' ?>>
+                                <?= htmlspecialchars($item['label']) ?>
+                            </a>
+                        <?php endforeach; ?>
+                    </nav>
+                </div>
+
+                <!-- Right Side Actions (Desktop & Mobile) -->
+                <div class="flex items-center gap-3">
+                    <?php if ($user): ?>
+                        <a href="/dashboard.php" class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm transition focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <span>My Dashboard</span>
+                            <span class="text-xs font-normal opacity-90">(<?= $fullName ?>)</span>
+                        </a>
+                    <?php else: ?>
+                        <a href="/login.php" class="text-sm font-semibold text-slate-700 hover:text-indigo-600 transition px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-lg">
+                            Log In
+                        </a>
+                        <a href="/register.php" class="inline-flex items-center px-4 py-2 text-sm font-bold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            Get Started
+                        </a>
+                    <?php endif; ?>
+
+                    <!-- Mobile Hamburger Button -->
+                    <button type="button" onclick="togglePublicMobileMenu()" class="md:hidden p-2 rounded-xl text-slate-600 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500" aria-label="Toggle Navigation Menu" aria-expanded="false" id="publicMobileMenuBtn">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Mobile Navigation Drawer -->
+            <div id="publicMobileMenu" class="hidden md:hidden border-t border-slate-200 bg-white px-4 pt-3 pb-6 space-y-2 shadow-xl">
+                <?php foreach ($navItems as $item): ?>
+                    <?php $isActive = ($activePage === $item['key']); ?>
+                    <a href="<?= htmlspecialchars($item['url']) ?>" 
+                       class="block px-3 py-2 rounded-lg text-sm font-semibold <?= $isActive ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-slate-700 hover:bg-slate-50' ?>">
+                        <?= htmlspecialchars($item['label']) ?>
+                    </a>
+                <?php endforeach; ?>
+                <div class="pt-2 border-t border-slate-100 flex flex-col gap-2">
+                    <?php if (!$user): ?>
+                        <a href="/login.php" class="text-center py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 hover:bg-slate-50">Log In</a>
+                        <a href="/register.php" class="text-center py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-bold shadow-sm hover:bg-indigo-700">Get Started</a>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </header>
+        <script>
+            function togglePublicMobileMenu() {
+                const menu = document.getElementById('publicMobileMenu');
+                const btn = document.getElementById('publicMobileMenuBtn');
+                const isHidden = menu.classList.toggle('hidden');
+                btn.setAttribute('aria-expanded', !isHidden);
+            }
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    const menu = document.getElementById('publicMobileMenu');
+                    if (menu && !menu.classList.contains('hidden')) {
+                        togglePublicMobileMenu();
+                    }
+                }
+            });
+        </script>
+        <?php
+    }
+
+    /**
+     * Render Accessible Public Footer
+     */
+    public static function renderPublicFooter(): void
+    {
+        ?>
+        <footer class="bg-slate-900 text-slate-400 py-12 border-t border-slate-800 mt-auto">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-8 pb-10 border-b border-slate-800">
+                    <div class="space-y-3 md:col-span-2">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center text-white font-bold text-lg">A</div>
+                            <span class="text-xl font-bold text-white tracking-tight">Appi<span class="text-indigo-400">Tutors</span></span>
+                        </div>
+                        <p class="text-xs text-slate-400 max-w-sm leading-relaxed">
+                            Premium UK tuition connecting parents and students with vetted, DBS-checked subject specialists across Primary, 11-Plus, GCSE, and A-Level curricula.
+                        </p>
+                    </div>
+                    <div>
+                        <h4 class="text-xs font-bold uppercase tracking-wider text-white mb-3">Tuition & Learning</h4>
+                        <ul class="space-y-2 text-xs">
+                            <li><a href="/tutors.php" class="hover:text-white transition">Find a Verified Tutor</a></li>
+                            <li><a href="/tutors.php?delivery_mode=ONLINE" class="hover:text-white transition">Online Lessons</a></li>
+                            <li><a href="/tutors.php?delivery_mode=IN_PERSON" class="hover:text-white transition">In-Person Lessons</a></li>
+                            <li><a href="/register.php" class="hover:text-white transition">Apply as a Tutor</a></li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 class="text-xs font-bold uppercase tracking-wider text-white mb-3">Curricula & Standards</h4>
+                        <ul class="space-y-2 text-xs">
+                            <li><span class="text-slate-300">GCSE & IGCSE Tuition</span></li>
+                            <li><span class="text-slate-300">A-Level & AS Subjects</span></li>
+                            <li><span class="text-slate-300">11+ Grammar Preparation</span></li>
+                            <li><span class="text-slate-300">Enhanced DBS Checked</span></li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+                    <div>© <?= date('Y') ?> AppiTutors Ltd. UK Registered Tutoring Platform. All rights reserved.</div>
+                    <div class="flex items-center gap-4 text-slate-400">
+                        <span>Europe/London (UK)</span>
+                        <span>•</span>
+                        <span>Official MVP Presentation Ready</span>
+                    </div>
+                </div>
+            </div>
+        </footer>
+        <?php
+    }
+
+    /**
      * Render Standard Footer
      */
     public static function renderFooter(): void

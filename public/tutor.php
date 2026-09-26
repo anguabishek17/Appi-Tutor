@@ -10,6 +10,8 @@ use App\Auth\AuthService;
 use App\Database\Connection;
 use App\Services\CsrfService;
 
+use App\Services\UIHelper;
+
 $user = AuthService::user();
 $db = Connection::getInstance();
 
@@ -17,7 +19,7 @@ $tutorProfileId = filter_var($_GET['id'] ?? 0, FILTER_VALIDATE_INT);
 
 if (!$tutorProfileId || $tutorProfileId <= 0) {
     http_response_code(404);
-    echo "<h1>404 Tutor Not Found</h1><p><a href='/tutors.php'>Return to Tutor Search</a></p>";
+    echo "<!DOCTYPE html><html><head><title>Tutor Not Found</title><script src='https://cdn.tailwindcss.com'></script></head><body class='bg-slate-50 flex items-center justify-center min-h-screen'><div class='text-center p-8 bg-white rounded-2xl shadow border max-w-md'><h1 class='text-2xl font-bold text-slate-800'>Tutor Profile Unavailable</h1><p class='text-slate-500 mt-2 text-sm'>Please check the link or search for available UK tutors.</p><a href='/tutors.php' class='mt-4 inline-block px-5 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-xs shadow-md'>Browse All Tutors</a></div></body></html>";
     exit;
 }
 
@@ -47,7 +49,7 @@ $tutor = $stmt->fetch();
 
 if (!$tutor) {
     http_response_code(404);
-    echo "<!DOCTYPE html><html><head><title>Tutor Not Found</title><script src='https://cdn.tailwindcss.com'></script></head><body class='bg-slate-50 flex items-center justify-center min-h-screen'><div class='text-center p-8 bg-white rounded-2xl shadow border'><h1 class='text-2xl font-bold text-slate-800'>Tutor Profile Unavailable</h1><p class='text-slate-500 mt-2'>This tutor is either pending review or not publicly available.</p><a href='/tutors.php' class='mt-4 inline-block px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-sm'>Browse Tutors</a></div></body></html>";
+    echo "<!DOCTYPE html><html><head><title>Tutor Not Found</title><script src='https://cdn.tailwindcss.com'></script></head><body class='bg-slate-50 flex items-center justify-center min-h-screen'><div class='text-center p-8 bg-white rounded-2xl shadow border max-w-md'><h1 class='text-2xl font-bold text-slate-800'>Tutor Profile Unavailable</h1><p class='text-slate-500 mt-2 text-sm'>This tutor is either pending review or not publicly available.</p><a href='/tutors.php' class='mt-4 inline-block px-5 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-xs shadow-md'>Browse All Tutors</a></div></body></html>";
     exit;
 }
 
@@ -124,32 +126,9 @@ $teachingModeBadge = $tutor['teaching_mode'] === 'ONLINE' ? 'Online Tutoring Onl
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>body { font-family: 'Plus Jakarta Sans', sans-serif; }</style>
 </head>
-<body class="min-h-screen flex flex-col justify-between text-slate-800">
+<body class="min-h-screen flex flex-col justify-between text-slate-800 antialiased selection:bg-indigo-500 selection:text-white">
 
-    <!-- Header Navigation -->
-    <header class="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-            <a href="/" class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-bold text-xl shadow-md shadow-indigo-200">A</div>
-                <span class="text-2xl font-extrabold tracking-tight text-slate-900">Appi<span class="text-indigo-600">Tutors</span></span>
-            </a>
-
-            <nav class="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-600">
-                <a href="/tutors.php" class="hover:text-indigo-600 transition">&larr; Back to All Tutors</a>
-            </nav>
-
-            <div class="flex items-center gap-4">
-                <?php if ($user): ?>
-                    <a href="/dashboard.php" class="inline-flex items-center px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 shadow-sm transition">
-                        Dashboard (<?= htmlspecialchars($user['first_name']) ?>)
-                    </a>
-                <?php else: ?>
-                    <a href="/login.php" class="text-sm font-semibold text-slate-700 hover:text-indigo-600 transition px-3 py-2">Log In</a>
-                    <a href="/register.php" class="inline-flex items-center px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 shadow-sm transition">Get Started</a>
-                <?php endif; ?>
-            </div>
-        </div>
-    </header>
+    <?= UIHelper::renderPublicHeader($user, 'find_tutors') ?>
 
     <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
         <!-- Tutor Profile Top Header Card -->
@@ -364,15 +343,7 @@ $teachingModeBadge = $tutor['teaching_mode'] === 'ONLINE' ? 'Online Tutoring Onl
         </div>
     </div>
 
-    <footer class="bg-slate-900 text-slate-400 py-12 border-t border-slate-800 mt-16">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-6">
-            <div class="flex items-center gap-3">
-                <div class="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center text-white font-bold text-lg">A</div>
-                <span class="text-xl font-bold text-white">Appi<span class="text-indigo-400">Tutors</span></span>
-            </div>
-            <p class="text-sm">© <?= date('Y') ?> AppiTutors Ltd. All rights reserved.</p>
-        </div>
-    </footer>
+    <?= UIHelper::renderPublicFooter() ?>
 
     <script>
         const bookingModal = document.getElementById('bookingModal');
