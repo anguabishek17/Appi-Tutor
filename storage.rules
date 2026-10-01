@@ -1,0 +1,22 @@
+rules_version = '2';
+
+/**
+ * UK Tutoring Platform - Cloud Storage Security Rules
+ * Foundation Phase (F01)
+ *
+ * Security Model:
+ * - Default Deny: All client uploads, modifications, and downloads are blocked by default.
+ * - Future authorization architecture:
+ *   1. Identity verification via Firebase Auth.
+ *   2. Strict mime-type, size, and metadata validation on upload paths.
+ *   3. Sensitive documents (e.g. DBS certificates, identity verification) must be isolated
+ *      in private storage buckets/paths accessible exclusively via server-side Cloud Functions.
+ */
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Default deny all client access across all storage paths
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "name": "uk-tutoring-platform",
+  "version": "0.1.0",
+  "private": true,
+  "description": "UK Tutoring Platform monorepo foundation",
+  "workspaces": [
+    "functions",
+    "web"
+  ],
+  "scripts": {
+    "install:all": "npm install",
+    "build": "npm run build --workspace=functions && npm run build --workspace=web",
+    "build:functions": "npm run build --workspace=functions",
+    "build:web": "npm run build --workspace=web",
+    "lint": "npm run lint --workspace=functions && npm run lint --workspace=web",
+    "lint:functions": "npm run lint --workspace=functions",
+    "lint:web": "npm run lint --workspace=web",
+    "format": "prettier --write \"**/*.{js,ts,json,md,html,css}\"",
+    "format:check": "prettier --check \"**/*.{js,ts,json,md,html,css}\"",
+    "dev:web": "npm run dev --workspace=web",
+    "emulators": "firebase emulators:start",
+    "emulators:export": "firebase emulators:export ./emulator-data",
+    "emulators:import": "firebase emulators:start --import=./emulator-data"
+  },
+  "devDependencies": {
+    "prettier": "^3.5.3"
+  }
+}
