@@ -244,3 +244,83 @@ export interface ContentDocument {
   data: Record<string, unknown>;
   updatedAt: unknown;
 }
+
+/**
+ * Payment Status States.
+ */
+export type PaymentStatus =
+  'PENDING' | 'SUCCEEDED' | 'FAILED' | 'CANCELLED' | 'REFUNDED' | 'PARTIALLY_REFUNDED';
+
+/**
+ * Refund Status States.
+ */
+export type RefundStatus = 'PENDING' | 'SUCCEEDED' | 'FAILED' | 'CANCELLED';
+
+/**
+ * Collection: payments/{paymentId}
+ * Payment record referencing booking. Stored in integer minor units (e.g. pence).
+ */
+export interface PaymentDocument {
+  id: string;
+  paymentId: string;
+  bookingId: string;
+  studentId: string;
+  studentUid?: string;
+  parentId?: string | null;
+  tutorId: string;
+  tutorUid?: string;
+  amount: number; // Integer minor units (e.g. 3500 pence)
+  currency: string; // e.g. 'GBP'
+  status: PaymentStatus;
+  provider: string; // e.g. 'MOCK_PROVIDER' | 'STRIPE'
+  providerPaymentId: string;
+  idempotencyKey?: string | null;
+  refundedAmount?: number;
+  createdAt: unknown;
+  updatedAt: unknown;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Collection: refunds/{refundId}
+ * Refund record referencing payment and booking.
+ */
+export interface RefundDocument {
+  id: string;
+  refundId: string;
+  paymentId: string;
+  bookingId: string;
+  amount: number; // Integer minor units
+  currency: string;
+  status: RefundStatus;
+  reason?: string | null;
+  providerRefundId?: string | null;
+  createdBy: string; // User UID or 'SYSTEM'
+  createdAt: unknown;
+  updatedAt: unknown;
+}
+
+/**
+ * Collection: paymentEvents/{eventId}
+ * Webhook event log preventing duplicate processing.
+ */
+export interface PaymentEventDocument {
+  id: string;
+  provider: string;
+  providerEventId: string;
+  paymentId?: string | null;
+  eventType: string;
+  receivedAt: unknown;
+  processedAt?: unknown | null;
+  status: 'PROCESSED' | 'FAILED' | 'IGNORED';
+}
+
+/**
+ * Collection: idempotencyKeys/{key}
+ */
+export interface IdempotencyKeyDocument {
+  key: string;
+  paymentId: string;
+  response: Record<string, unknown>;
+  createdAt: unknown;
+}

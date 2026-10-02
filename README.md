@@ -2,8 +2,8 @@
 
 Enterprise tutoring web application built on Firebase serverless infrastructure and vanilla modern web architecture.
 
-> **Current Scope: Phase F05 — Lesson Booking, Availability & Double-Booking Prevention**  
-> This repository implements the complete lesson booking system, availability slot creation/management, Firestore transactional double-booking prevention, central status transition validator, booking history tracking, role-based access control, frontend UI, and comprehensive test suite (F05-01 through F05-36). **F06 payments and notifications belong to subsequent phases.**
+> **Current Scope: Phase F06 — Payments & Refunds**  
+> This repository implements the complete server-authoritative payment and refund system, integer minor units currency handling, idempotency key processing, webhook signature verification and event logging, state machine transitions, frontend UI components, and integration test suite (F06-01 through F06-33). **F01–F05 functionality is preserved intact.**
 
 ---
 
@@ -40,33 +40,54 @@ The UK Tutoring Platform provides a bespoke matching and lesson management solut
 │       ├── endpoints/
 │       │   ├── auth.ts        # registerUser & protected role example endpoints
 │       │   ├── tutorOnboarding.ts # F04 profile update, DBS upload, manager review endpoints
-│       │   └── booking.ts     # F05 availability slots & transactional booking endpoints
-│       ├── helpers/           # Request IDs, response formatters, logger, Zod validation, roles, bookingValidator
+│       │   ├── booking.ts     # F05 availability slots & transactional booking endpoints
+│       │   └── payment.ts     # F06 payment creation, confirmation, webhook & refund endpoints
+│       ├── helpers/           # Request IDs, response formatters, logger, Zod validation, roles, bookingValidator, paymentValidator
 │       ├── middleware/        # Correlation wrapper & auth authorization middleware
+│       ├── services/
+│       │   └── paymentProvider.ts # F06 PaymentProvider abstraction & MockPaymentProvider
 │       ├── test/
 │       │   ├── auth.test.ts   # Master test runner index
 │       │   ├── unit/          # Auth unit & mock tests
-│       │   ├── integration/   # HTTP integration, firestore rules, F04 onboarding & F05 booking tests (F05-01 to F05-36)
+│       │   ├── integration/   # Integration, rules, onboarding, booking & payment tests (F06-01 to F06-33)
 │       │   └── frontend/      # Frontend auth service tests
-│       └── types/             # Shared TypeScript models (UserRole, UserStatus, BookingStatus, AvailabilitySlot)
+│       └── types/             # Shared TypeScript models
 │           ├── index.ts
-│           └── firestore.ts   # F03/F04/F05 Firestore document schemas & type definitions
+│           └── firestore.ts   # Firestore document schemas & type definitions (F01–F06)
 │
 └── web/                       # Frontend Web Application
     ├── package.json
     ├── vite.config.js         # Vite bundler configuration
     ├── index.html             # HTML5 SPA entry point
-    └── src/                   # Auth, Onboarding & Booking components
+    └── src/                   # Auth, Onboarding, Booking & Payment components
         ├── main.js
         └── components/
             ├── authUI.js      # Auth component
             ├── tutorOnboardingUI.js # Tutor onboarding & Manager review UI
-            └── bookingUI.js   # F05 Lesson booking & availability management UI
+            ├── bookingUI.js   # F05 Lesson booking & availability management UI
+            └── paymentUI.js   # F06 Payment initiation, confirmation & refund UI
 ```
 
 ---
 
-## 3. Lesson Booking Lifecycle & State Transitions
+## 3. Payments & Refunds Architecture (Phase F06)
+
+### Server-Authoritative Financial Logic
+
+- **No Client Trust**: Payable amounts and financial metadata are calculated server-side from tutor profiles (`hourlyRatePence`) and booking details. Browser-supplied amounts or financial statuses are strictly ignored.
+- **Integer Minor Units**: All monetary values are processed and stored as integer minor units (`amountPence`, e.g., £25.50 = 2550 pence, currency = `GBP`) to avoid floating-point binary math errors.
+- **Idempotency**: Requests containing an `Idempotency-Key` are recorded in `idempotencyKeys/{key}` inside Firestore transactions to prevent duplicate charges or double payments.
+- **State Machine Validation**: Payment states (`PENDING`, `SUCCEEDED`, `FAILED`, `CANCELLED`, `REFUNDED`, `PARTIALLY_REFUNDED`) and Refund states (`PENDING`, `SUCCEEDED`, `FAILED`, `CANCELLED`) follow strict transition validation via `isValidPaymentTransition` and `isValidRefundTransition`.
+
+### Provider Abstraction & Webhook Verification
+
+- **`PaymentProvider` Interface**: Isolates provider-specific logic, allowing seamless pluggability for production gateways (e.g. Stripe, Adyen).
+- **`MockPaymentProvider`**: Provides safe, deterministic test/emulator payment intents and refunds without requiring live secrets.
+- **Webhook Security**: Webhook signatures are verified server-side (`verifyWebhookSignature`). Unique `providerEventId` records in `paymentEvents/{eventId}` guarantee idempotent, single-execution webhook event processing.
+
+---
+
+## 4. Lesson Booking Lifecycle & State Transitions
 
 Bookings follow an explicit, server-verified lifecycle:
 
@@ -86,69 +107,45 @@ Bookings follow an explicit, server-verified lifecycle:
 [COMPLETED] [CANCELLED]                 [PENDING]    [CANCELLED]/[REJECTED]
 ```
 
-### Transition Rules
-
-- `PENDING` → `CONFIRMED`, `REJECTED`, `RESCHEDULE_PROPOSED`, `CANCELLED`, `SYSTEM_CANCELLED`
-- `CONFIRMED` → `COMPLETED`, `CANCELLED`, `SYSTEM_CANCELLED`
-- `RESCHEDULE_PROPOSED` → `PENDING`, `CANCELLED`, `REJECTED`, `SYSTEM_CANCELLED`
-
-All invalid status transitions are rejected with error `BOOKING_INVALID_STATE_TRANSITION`.
-
 ---
 
-## 4. Double-Booking Prevention & Concurrency Authority
+## 5. Automated Test Suite (F06-01 to F06-33)
 
-- **Firestore Concurrency Authority**: Double-booking prevention uses Firestore transactions (`db.runTransaction`).
-- **Atomic Operations**:
-  1. Read availability slot (`availabilitySlots/{slotId}`).
-  2. Verify slot existence & `status === 'AVAILABLE'`.
-  3. Verify tutor `approvalStatus === 'APPROVED' / 'MANAGER_APPROVED'`, `isBookable === true`, `isPublic === true`.
-  4. Write `bookings/{bookingId}` document with status `'PENDING'`.
-  5. Atomically update slot status to `'BOOKED'` and attach `bookingId`.
-- **Race Condition Prevention**: If two concurrent booking requests target the same slot, exactly one transaction succeeds and the second transaction fails safely with `SLOT_ALREADY_BOOKED` (409).
-
----
-
-## 5. Automated Test Suite (F05-01 to F05-36)
-
-| Test ID    | Objective                                                   | Expected Result | Status |
-| :--------- | :---------------------------------------------------------- | :-------------- | :----- |
-| **F05-01** | Tutor can create availability                               | ALLOWED         | PASS   |
-| **F05-02** | Non-tutor cannot create tutor availability                  | DENIED          | PASS   |
-| **F05-03** | Unapproved tutor cannot create bookable availability        | DENIED (403)    | PASS   |
-| **F05-04** | Approved/bookable tutor can create availability             | ALLOWED         | PASS   |
-| **F05-05** | Tutor cannot modify another tutor's availability            | DENIED (403)    | PASS   |
-| **F05-06** | Student can retrieve available slots                        | ALLOWED         | PASS   |
-| **F05-07** | Private tutor data is not exposed through availability      | VERIFIED        | PASS   |
-| **F05-08** | Student can create booking                                  | ALLOWED         | PASS   |
-| **F05-09** | Booking starts in PENDING                                   | VERIFIED        | PASS   |
-| **F05-10** | Booking contains initial statusHistory entry                | VERIFIED        | PASS   |
-| **F05-11** | Student cannot directly modify booking status               | DENIED          | PASS   |
-| **F05-12** | Student cannot modify statusHistory                         | DENIED          | PASS   |
-| **F05-13** | Tutor can view their own bookings                           | ALLOWED         | PASS   |
-| **F05-14** | Tutor cannot view another tutor's private bookings          | DENIED (403)    | PASS   |
-| **F05-15** | Valid PENDING → CONFIRMED transition succeeds               | ALLOWED         | PASS   |
-| **F05-16** | Valid PENDING → REJECTED transition succeeds                | ALLOWED         | PASS   |
-| **F05-17** | Valid PENDING → RESCHEDULE_PROPOSED transition succeeds     | ALLOWED         | PASS   |
-| **F05-18** | Valid booking cancellation succeeds where permitted         | ALLOWED         | PASS   |
-| **F05-19** | Valid CONFIRMED → COMPLETED transition succeeds             | ALLOWED         | PASS   |
-| **F05-20** | Invalid booking transition is rejected                      | REJECTED (400)  | PASS   |
-| **F05-21** | Booking history is appended on status change                | VERIFIED        | PASS   |
-| **F05-22** | Previous status history cannot be rewritten by client       | VERIFIED        | PASS   |
-| **F05-23** | Already reserved slot cannot be booked again                | REJECTED (409)  | PASS   |
-| **F05-24** | Concurrent booking attempts cannot double-book a slot       | VERIFIED        | PASS   |
-| **F05-25** | Exactly one booking wins the concurrent race                | VERIFIED        | PASS   |
-| **F05-26** | Tutor suspension prevents new booking activity              | DENIED (403)    | PASS   |
-| **F05-27** | Server checks tutor bookable state                          | VERIFIED        | PASS   |
-| **F05-28** | Booking timestamps are stored using server timestamps       | VERIFIED        | PASS   |
-| **F05-29** | UTC timestamps are correctly represented as Europe/London   | VERIFIED        | PASS   |
-| **F05-30** | Manager can access permitted booking administration         | ALLOWED         | PASS   |
-| **F05-31** | Unauthorized user cannot access manager booking functions   | DENIED (403)    | PASS   |
-| **F05-32** | Sensitive manager action creates audit log where applicable | VERIFIED        | PASS   |
-| **F05-33** | F01 regression passes                                       | PASS            | PASS   |
-| **F05-34** | F02 regression passes                                       | PASS            | PASS   |
-| **F05-35** | F03 regression passes                                       | PASS            | PASS   |
-| **F05-36** | F04 regression passes                                       | PASS            | PASS   |
+| Test ID    | Objective                                                     | Expected Result | Status |
+| :--------- | :------------------------------------------------------------ | :-------------- | :----- |
+| **F06-01** | Authorized user can initiate payment for permitted booking    | ALLOWED         | PASS   |
+| **F06-02** | Unauthorized user cannot initiate payment for another booking | DENIED (403)    | PASS   |
+| **F06-03** | Payment amount is server-authoritative                        | VERIFIED        | PASS   |
+| **F06-04** | Client cannot set payment status                              | DENIED          | PASS   |
+| **F06-05** | Client cannot set arbitrary provider payment ID               | DENIED          | PASS   |
+| **F06-06** | Payment starts in correct initial state (PENDING)             | VERIFIED        | PASS   |
+| **F06-07** | Valid payment state transition succeeds                       | ALLOWED         | PASS   |
+| **F06-08** | Invalid payment state transition fails                        | REJECTED (400)  | PASS   |
+| **F06-09** | Duplicate payment request is handled idempotently             | VERIFIED        | PASS   |
+| **F06-10** | Duplicate payment does not create a second payment            | VERIFIED        | PASS   |
+| **F06-11** | Payment record references valid booking                       | VERIFIED        | PASS   |
+| **F06-12** | Payment cannot reference unauthorized booking                 | DENIED (403)    | PASS   |
+| **F06-13** | Payment timestamps use server timestamps                      | VERIFIED        | PASS   |
+| **F06-14** | Financial amount uses integer minor units                     | VERIFIED        | PASS   |
+| **F06-15** | Unauthorized user cannot read another user's payment          | DENIED (403)    | PASS   |
+| **F06-16** | Tutor cannot modify payment status                            | DENIED (403)    | PASS   |
+| **F06-17** | Manager can access permitted payment records                  | ALLOWED         | PASS   |
+| **F06-18** | Sensitive manager financial action creates audit log          | VERIFIED        | PASS   |
+| **F06-19** | Valid refund request is processed where policy permits        | ALLOWED         | PASS   |
+| **F06-20** | Refund cannot exceed captured payment amount                  | REJECTED (400)  | PASS   |
+| **F06-21** | Duplicate refund cannot be created                            | REJECTED (400)  | PASS   |
+| **F06-22** | Client cannot mark refund as successful in Firestore          | DENIED (Rules)  | PASS   |
+| **F06-23** | Unauthorized refund request fails                             | DENIED (403)    | PASS   |
+| **F06-24** | Invalid refund state transition fails                         | REJECTED (400)  | PASS   |
+| **F06-25** | Invalid webhook signature is rejected                         | REJECTED (400)  | PASS   |
+| **F06-26** | Duplicate webhook event is ignored safely                     | VERIFIED        | PASS   |
+| **F06-27** | Valid provider event updates payment state correctly          | VERIFIED        | PASS   |
+| **F06-28** | Secrets are not written to logs                               | VERIFIED        | PASS   |
+| **F06-29** | F01 regression passes                                         | PASS            | PASS   |
+| **F06-30** | F02 regression passes                                         | PASS            | PASS   |
+| **F06-31** | F03 regression passes                                         | PASS            | PASS   |
+| **F06-32** | F04 regression passes                                         | PASS            | PASS   |
+| **F06-33** | F05 regression passes                                         | PASS            | PASS   |
 
 ---
 
@@ -158,7 +155,7 @@ All invalid status transitions are rejected with error `BOOKING_INVALID_STATE_TR
 # Build both Cloud Functions and Web workspace
 npm run build
 
-# Run master test suite (182 tests across 12 suites)
+# Run master test suite (248 tests across 14 suites)
 npm test
 
 # Run ESLint across all workspaces
@@ -175,19 +172,20 @@ npm run format
 
 ## 7. Open Business Decisions
 
-1. **Cancellation Windows & Fees**: Does the platform impose a minimum notice window (e.g., 24 hours prior to lesson start) before a student can cancel without penalty? Isolated as configurable business setting.
-2. **Reschedule Limits**: How many times can a booking transition between `RESCHEDULE_PROPOSED` and `PENDING` before requiring manager review or automatic cancellation? Isolated as configurable business setting.
-3. **Slot Duration Constraints**: Should slots enforce a fixed duration (e.g. 60 mins), or allow arbitrary duration windows set by tutors? Currently supports arbitrary ranges with `startAt < endAt` validation.
+1. **Lesson Pricing & Commission Policy**: Specific tutor commission split percentages, platform service fees, and tutor payout schedules are isolated in configuration as pending client policy decisions.
+2. **Refund Rules & Deadlines**: Full vs. partial refund eligibility windows (e.g. 24h prior cancellation refund rules) are kept configurable.
+3. **VAT & Tax Automation**: VAT rules and tax calculations are not hardcoded and require client policy definition prior to live processing.
+4. **Live Provider Credentials**: Production gateway credentials (e.g., Stripe API Secret Keys and Webhook Signing Secrets) must be injected into environment variables (`PAYMENT_PROVIDER_SECRET`, `PAYMENT_WEBHOOK_SECRET`) prior to production launch.
 
 ---
 
 ## 8. Phase Status Summary
 
-| Phase    | Description                                              | Status       |
-| :------- | :------------------------------------------------------- | :----------- |
-| **F01**  | Project Foundation & Monorepo Tooling                    | **Complete** |
-| **F02**  | Authentication, Roles & Authorization Middleware         | **Complete** |
-| **F03**  | Firestore Data Model & Security Rules                    | **Complete** |
-| **F04**  | Tutor Onboarding, DBS & Manager Approval                 | **Complete** |
-| **F05**  | Lesson Booking, Availability & Double-Booking Prevention | **Complete** |
-| **F06+** | Payments, Email Notifications & Advanced Features        | _Pending_    |
+| Phase   | Description                                              | Status       |
+| :------ | :------------------------------------------------------- | :----------- |
+| **F01** | Project Foundation & Monorepo Tooling                    | **Complete** |
+| **F02** | Authentication, Roles & Authorization Middleware         | **Complete** |
+| **F03** | Firestore Data Model & Security Rules                    | **Complete** |
+| **F04** | Tutor Onboarding, DBS & Manager Approval                 | **Complete** |
+| **F05** | Lesson Booking, Availability & Double-Booking Prevention | **Complete** |
+| **F06** | Payments & Refunds Layer                                 | **Complete** |

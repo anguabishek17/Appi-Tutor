@@ -190,6 +190,46 @@ service cloud.firestore {
     }
 
     // ------------------------------------------------------------------------
+    // 8b. payments/{paymentId} (Phase F06)
+    // ------------------------------------------------------------------------
+    match /payments/{paymentId} {
+      // Allowed for student owner, assigned tutor, or manager.
+      allow read: if isAuthenticated() && (
+        request.auth.uid == resource.data.studentId ||
+        request.auth.uid == resource.data.studentUid ||
+        request.auth.uid == resource.data.tutorId ||
+        request.auth.uid == resource.data.tutorUid ||
+        isManager()
+      );
+      // All financial mutations are server-authoritative via Cloud Functions.
+      allow write: if false;
+    }
+
+    // ------------------------------------------------------------------------
+    // 8c. refunds/{refundId} (Phase F06)
+    // ------------------------------------------------------------------------
+    match /refunds/{refundId} {
+      // Allowed for student owner, assigned tutor, or manager.
+      allow read: if isAuthenticated() && (
+        request.auth.uid == resource.data.createdBy ||
+        isManager()
+      );
+      // All refund mutations are server-authoritative via Cloud Functions.
+      allow write: if false;
+    }
+
+    // ------------------------------------------------------------------------
+    // 8d. paymentEvents/{eventId} & idempotencyKeys/{key} (Phase F06)
+    // ------------------------------------------------------------------------
+    match /paymentEvents/{eventId} {
+      allow read, write: if false;
+    }
+
+    match /idempotencyKeys/{key} {
+      allow read, write: if false;
+    }
+
+    // ------------------------------------------------------------------------
     // 9. newsletterSubscribers/{id}
     // ------------------------------------------------------------------------
     match /newsletterSubscribers/{id} {

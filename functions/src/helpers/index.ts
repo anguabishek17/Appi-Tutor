@@ -9,3 +9,4 @@ export * from './logger';
 export * from './validation';
 export * from './roles';
 export * from './bookingValidator';
+export * from './paymentValidator';

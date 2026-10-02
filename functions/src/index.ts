@@ -83,6 +83,18 @@ export {
   managerCancelBooking,
 } from './endpoints/booking';
 
+// Payments & Refunds Endpoints (Phase F06)
+export {
+  createPayment,
+  confirmPayment,
+  getPayment,
+  getMyPayments,
+  processRefund,
+  handlePaymentWebhook,
+  managerListPayments,
+} from './endpoints/payment';
+export * from './services/paymentProvider';
+
 // Export shared helpers, config, types, and middleware for subsequent phases
 export * from './config';
 export * from './helpers';
