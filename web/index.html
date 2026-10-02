@@ -8,7 +8,7 @@
       content="UK Tutoring Platform - High quality, trusted UK tutoring services."
     />
     <meta name="theme-color" content="#0284c7" />
-    <title>UK Tutoring Platform | Foundation</title>
+    <title>UK Tutoring Platform | Authentication & Roles</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -33,9 +33,9 @@
         </div>
         <div class="flex items-center space-x-2 text-xs">
           <span
-            class="inline-flex items-center px-2.5 py-0.5 rounded-full font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+            class="inline-flex items-center px-2.5 py-0.5 rounded-full font-medium bg-sky-500/10 text-sky-400 border border-sky-500/20"
           >
-            F01 Foundation Active
+            F02 Authentication Active
           </span>
           <span
             class="inline-flex items-center px-2.5 py-0.5 rounded-full font-medium bg-slate-800 text-slate-400 border border-slate-700"
@@ -47,73 +47,13 @@
     </header>
 
     <!-- Main Content Area -->
-    <main class="flex-grow flex items-center justify-center p-6" id="app">
-      <div
-        class="max-w-xl w-full bg-slate-800/60 border border-slate-700/60 rounded-2xl p-8 backdrop-blur-md shadow-2xl space-y-6 text-center"
-      >
-        <div
-          class="w-16 h-16 mx-auto rounded-2xl bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400"
-        >
-          <svg
-            class="w-8 h-8"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-            />
-          </svg>
-        </div>
-
-        <div>
-          <h1 class="text-2xl font-bold text-white tracking-tight">
-            Monorepo Foundation Initialized
-          </h1>
-          <p class="text-slate-400 text-sm mt-2">
-            Phase F01 foundation is ready. No business features or user-facing authentication routes
-            are active in this phase.
-          </p>
-        </div>
-
-        <div
-          class="grid grid-cols-2 gap-3 text-left text-xs bg-slate-900/60 p-4 rounded-xl border border-slate-800"
-        >
-          <div>
-            <span class="text-slate-500 block">Frontend Stack</span>
-            <span class="font-medium text-slate-200">Vite + Vanilla JS + Tailwind</span>
-          </div>
-          <div>
-            <span class="text-slate-500 block">Backend Runtime</span>
-            <span class="font-medium text-slate-200">Cloud Functions 2nd Gen (TS)</span>
-          </div>
-          <div>
-            <span class="text-slate-500 block">Database & Storage</span>
-            <span class="font-medium text-slate-200">Firestore & Cloud Storage</span>
-          </div>
-          <div>
-            <span class="text-slate-500 block">Target Region</span>
-            <span class="font-medium text-sky-400">europe-west2</span>
-          </div>
-        </div>
-
-        <div
-          id="emulator-status"
-          class="text-xs text-slate-400 border-t border-slate-700/60 pt-4 flex items-center justify-center space-x-2"
-        >
-          <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
-          <span>Checking Firebase client status...</span>
-        </div>
-      </div>
+    <main class="flex-grow p-6 flex flex-col justify-center" id="app">
+      <!-- Mounted by main.js setupAuthUI -->
     </main>
 
     <!-- Footer -->
     <footer class="border-t border-slate-800/80 py-4 text-center text-xs text-slate-500">
-      UK Tutoring Platform &bull; Phase F01: Foundation Architecture
+      UK Tutoring Platform &bull; Phase F02: Authentication & Role-Based Access Control
     </footer>
 
     <script type="module" src="/src/main.js"></script>

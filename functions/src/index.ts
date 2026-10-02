@@ -27,6 +27,7 @@ setGlobalOptions({
  * Used strictly for verifying 2nd Gen runtime, europe-west2 region,
  * and standard request ID / response formatting.
  */
+// Foundation Phase Endpoints
 export const healthCheck = onRequest(
   {
     region: DEFAULT_REGION,
@@ -37,11 +38,31 @@ export const healthCheck = onRequest(
       status: 'healthy',
       region: DEFAULT_REGION,
       env: config.env,
-      version: '0.1.0-f01',
+      version: '0.2.0-f02',
       timestamp: context.timestamp,
     });
   })
 );
+
+// Authentication & Authorization Endpoints (Phase F02)
+export {
+  registerUser,
+  protectedStudentParentExample,
+  protectedTutorExample,
+  protectedManagerExample,
+} from './endpoints/auth';
+
+// Tutor Onboarding & Manager Approval Endpoints (Phase F04)
+export {
+  updateTutorProfile,
+  submitDbsDocument,
+  getTutorOnboardingStatus,
+  managerListPendingTutors,
+  managerApproveTutor,
+  managerRejectTutor,
+  managerSuspendTutor,
+  managerReapproveTutor,
+} from './endpoints/tutorOnboarding';
 
 // Export shared helpers, config, types, and middleware for subsequent phases
 export * from './config';

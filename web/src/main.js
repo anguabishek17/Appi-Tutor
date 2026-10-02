@@ -1,18 +1,16 @@
 /**
  * UK Tutoring Platform - Web Frontend Entry Point
- * Foundation Phase (F01)
+ * Authentication Phase (F02)
  */
 
 import './styles/main.css';
-import { app } from './firebase/config.js';
+import { setupAuthUI } from './components/authUI.js';
+import { setupTutorOnboardingUI } from './components/tutorOnboardingUI.js';
 
-console.info('UK Tutoring Platform Foundation initialized.');
+console.info('UK Tutoring Platform Phase F04 Initialized.');
 
-const statusElement = document.getElementById('emulator-status');
-if (statusElement) {
-  const isDev = import.meta.env.DEV;
-  statusElement.innerHTML = `
-    <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-    <span>Firebase client initialized (${app.name}) &bull; Mode: <strong class="text-slate-200">${isDev ? 'Local Development' : 'Production'}</strong></span>
-  `;
+const appElement = document.getElementById('app');
+if (appElement) {
+  setupAuthUI(appElement);
+  setupTutorOnboardingUI(appElement);
 }

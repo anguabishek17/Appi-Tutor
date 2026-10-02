@@ -2,21 +2,228 @@ rules_version = '2';
 
 /**
  * UK Tutoring Platform - Cloud Firestore Security Rules
- * Foundation Phase (F01)
+ * Data Model & Security Boundary Phase (F03)
  *
- * Security Model:
- * - Default Deny: All client reads and writes are blocked by default.
- * - Future authorization architecture:
- *   1. Roles derived from server-side verified Firebase Auth Custom Claims (e.g. admin, tutor, client).
- *   2. Identity and resource ownership verification (request.auth.uid == resource.data.userId).
- *   3. All privileged operations and mutations must occur through Cloud Functions 2nd Gen.
- *   4. Client direct writes to sensitive/system collections are strictly prohibited.
+ * Security Principles:
+ * 1. Default Deny: All client reads and writes are blocked by default.
+ * 2. Role-Based Access Control (RBAC): Roles derived strictly from server-verified
+ *    Firebase Auth Custom Claims (`request.auth.token.role`). Supported roles:
+ *    - STUDENT_PARENT
+ *    - TUTOR
+ *    - MANAGER
+ * 3. Zero Client Trust: Clients cannot elevate their roles, status, approval flags,
+ *    DBS verification, booking status, status history, or write audit logs.
+ * 4. Document-level Separation: Private tutor/user profiles and public tutor directory
+ *    are separate collections.
  */
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Default deny all client access across all collections
+
+    // ------------------------------------------------------------------------
+    // Helper Functions
+    // ------------------------------------------------------------------------
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isUser(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
+    }
+
+    function hasRole(role) {
+      return isAuthenticated() && request.auth.token.role == role;
+    }
+
+    function isManager() {
+      return hasRole('MANAGER');
+    }
+
+    function isTutor() {
+      return hasRole('TUTOR');
+    }
+
+    function isStudentParent() {
+      return hasRole('STUDENT_PARENT');
+    }
+
+    // Default deny across all collections
     match /{document=**} {
       allow read, write: if false;
+    }
+
+    // ------------------------------------------------------------------------
+    // 1. users/{uid}
+    // ------------------------------------------------------------------------
+    match /users/{uid} {
+      // User can read their own document; Manager can read any user document.
+      allow get: if isUser(uid) || isManager();
+      // Arbitrary client user enumeration is blocked (only Managers can list).
+      allow list: if isManager();
+
+      // Creation is server-authoritative via Admin SDK / registerUser function.
+      allow create: if false;
+
+      // User can update non-authoritative fields (e.g. displayName),
+      // but CANNOT modify role, status, uid, createdAt, or emailVerifiedAt.
+      allow update: if isUser(uid)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'role', 'status', 'uid', 'createdAt', 'emailVerifiedAt'
+        ])
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.status == resource.data.status
+        && request.resource.data.uid == resource.data.uid;
+
+      allow delete: if false;
+
+      // Subcollection: users/{parentUid}/children/{childId}
+      match /children/{childId} {
+        // Only the parent (STUDENT_PARENT) can access their own children documents.
+        // Manager get is permitted for administrative oversight.
+        allow get: if (isUser(parentUid) && isStudentParent()) || isManager();
+        allow list, create, update, delete: if isUser(parentUid) && isStudentParent();
+      }
+    }
+
+    // ------------------------------------------------------------------------
+    // 2. tutorProfiles/{uid} (Private Tutor Profile)
+    // ------------------------------------------------------------------------
+    match /tutorProfiles/{uid} {
+      // Tutor can read their own private profile; Manager can read.
+      allow get: if isUser(uid) || isManager();
+      allow list: if isManager();
+
+      // Tutor can update permitted non-authoritative fields.
+      // Must NOT modify: approvalStatus, bookableStatus, publicStatus, dbsVerifiedStatus,
+      // role, status, managerNotes, approvedAt, dbsVerifiedAt, isApproved, isBookable, isPublic, isDbsVerified.
+      allow update: if isUser(uid) && isTutor()
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'approvalStatus', 'bookableStatus', 'publicStatus', 'dbsVerifiedStatus',
+          'dbsStatus', 'onboardingStatus', 'role', 'status', 'managerNotes',
+          'approvedAt', 'approvedBy', 'rejectedAt', 'rejectedBy', 'rejectionReason',
+          'suspendedAt', 'suspendedBy', 'suspensionReason', 'dbsVerifiedAt',
+          'isApproved', 'isBookable', 'isPublic', 'isDbsVerified'
+        ]);
+
+
+      allow create, delete: if false;
+    }
+
+    // ------------------------------------------------------------------------
+    // 3. publicTutors/{uid} (Public Read Model)
+    // ------------------------------------------------------------------------
+    match /publicTutors/{uid} {
+      // Public directory read access for safe tutor information.
+      allow read: if true;
+      // Direct client creation/update/deletion is DENIED. Server/Admin SDK controlled only.
+      allow write: if false;
+    }
+
+    // ------------------------------------------------------------------------
+    // 4. studentProfiles/{uid}
+    // ------------------------------------------------------------------------
+    match /studentProfiles/{uid} {
+      // Student/parent can read their own profile; Manager can read.
+      allow get: if isUser(uid) || isManager();
+      allow list: if isManager();
+
+      // Student/parent can create/update their own profile, but cannot modify role/status/uid/createdAt.
+      allow create: if isUser(uid) && isStudentParent();
+      allow update: if isUser(uid) && isStudentParent()
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'role', 'status', 'uid', 'createdAt'
+        ]);
+
+      allow delete: if false;
+    }
+
+    // ------------------------------------------------------------------------
+    // 5. availabilitySlots/{slotId}
+    // ------------------------------------------------------------------------
+    match /availabilitySlots/{slotId} {
+      // Authenticated users can read availability slots to view tutor availability.
+      allow read: if isAuthenticated();
+
+      // Tutor can create their own availability slot.
+      allow create: if isTutor()
+        && request.resource.data.tutorId == request.auth.uid;
+
+      // Tutor can update their own slot, but cannot reassign tutorId.
+      allow update: if isTutor()
+        && resource.data.tutorId == request.auth.uid
+        && request.resource.data.tutorId == request.auth.uid;
+
+      // Tutor can delete their own availability slot.
+      allow delete: if isTutor()
+        && resource.data.tutorId == request.auth.uid;
+    }
+
+    // ------------------------------------------------------------------------
+    // 6. bookings/{bookingId}
+    // ------------------------------------------------------------------------
+    match /bookings/{bookingId} {
+      // Allowed for student/parent owner, tutor assigned, or manager.
+      allow read: if isAuthenticated() && (
+        request.auth.uid == resource.data.studentUid ||
+        request.auth.uid == resource.data.tutorUid ||
+        isManager()
+      );
+
+      // Clients cannot directly mutate booking status or statusHistory.
+      // All booking creations and status transitions are server-authoritative via Cloud Functions.
+      allow write: if false;
+    }
+
+    // ------------------------------------------------------------------------
+    // 7. lessonNotes/{noteId}
+    // ------------------------------------------------------------------------
+    match /lessonNotes/{noteId} {
+      // Default DENY direct client access in F03.
+      allow read, write: if false;
+    }
+
+    // ------------------------------------------------------------------------
+    // 8. auditLogs/{id}
+    // ------------------------------------------------------------------------
+    match /auditLogs/{id} {
+      // Server write-only. Direct client create/read/update/delete DENIED.
+      allow read, write: if false;
+    }
+
+    // ------------------------------------------------------------------------
+    // 9. newsletterSubscribers/{id}
+    // ------------------------------------------------------------------------
+    match /newsletterSubscribers/{id} {
+      // Direct client read/write DENIED. Server-side / backend function only.
+      allow read, write: if false;
+    }
+
+    // 10. blogPosts/{postId}
+    // ------------------------------------------------------------------------
+    match /blogPosts/{postId} {
+      // Public read for published blog posts only. Manager can read all.
+      allow read: if isManager() || (resource != null && resource.data.isPublished == true);
+      // Direct client write DENIED. Controlled via backend functions.
+      allow write: if false;
+    }
+
+    // ------------------------------------------------------------------------
+    // 11. testimonials/{id}
+    // ------------------------------------------------------------------------
+    match /testimonials/{id} {
+      // Public read for approved testimonials only. Manager can read all.
+      allow read: if isManager() || (resource != null && resource.data.isApproved == true);
+      // Direct client write/approval DENIED.
+      allow write: if false;
+    }
+
+    // ------------------------------------------------------------------------
+    // 12. content/{id}
+    // ------------------------------------------------------------------------
+    match /content/{id} {
+      // Public/authenticated read allowed for platform CMS content.
+      allow read: if true;
+      // Direct client write DENIED.
+      allow write: if false;
     }
   }
 }

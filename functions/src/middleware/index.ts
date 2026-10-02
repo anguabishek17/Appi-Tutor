@@ -70,3 +70,5 @@ export function wrapHttpFunction(handler: HttpHandler) {
     }
   };
 }
+
+export * from './auth';

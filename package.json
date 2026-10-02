@@ -17,12 +17,14 @@
     "lint:web": "npm run lint --workspace=web",
     "format": "prettier --write \"**/*.{js,ts,json,md,html,css}\"",
     "format:check": "prettier --check \"**/*.{js,ts,json,md,html,css}\"",
+    "test": "npm run test --workspace=functions",
     "dev:web": "npm run dev --workspace=web",
     "emulators": "firebase emulators:start",
     "emulators:export": "firebase emulators:export ./emulator-data",
     "emulators:import": "firebase emulators:start --import=./emulator-data"
   },
   "devDependencies": {
+    "firebase-tools": "^15.32.1",
     "prettier": "^3.5.3"
   }
 }

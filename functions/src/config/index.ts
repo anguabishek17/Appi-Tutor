@@ -65,3 +65,15 @@ export function loadConfig(): AppConfig {
 }
 
 export const config = loadConfig();
+
+import { initializeApp, getApps } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+
+export function getAdminFirestore() {
+  if (getApps().length === 0) {
+    initializeApp({
+      projectId: process.env.GCLOUD_PROJECT || 'uk-tutoring-platform-f04-test',
+    });
+  }
+  return getFirestore();
+}

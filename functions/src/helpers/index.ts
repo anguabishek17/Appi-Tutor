@@ -7,3 +7,4 @@ export * from './requestId';
 export * from './response';
 export * from './logger';
 export * from './validation';
+export * from './roles';

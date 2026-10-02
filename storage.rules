@@ -2,21 +2,43 @@ rules_version = '2';
 
 /**
  * UK Tutoring Platform - Cloud Storage Security Rules
- * Foundation Phase (F01)
+ * Phase F04 - DBS Security & Private File Boundaries
  *
  * Security Model:
- * - Default Deny: All client uploads, modifications, and downloads are blocked by default.
- * - Future authorization architecture:
- *   1. Identity verification via Firebase Auth.
- *   2. Strict mime-type, size, and metadata validation on upload paths.
- *   3. Sensitive documents (e.g. DBS certificates, identity verification) must be isolated
- *      in private storage buckets/paths accessible exclusively via server-side Cloud Functions.
+ * - Default Deny: All unmapped paths are blocked.
+ * - Private DBS isolation: Uploaded certificates are stored at `dbs/{uid}/{filename}`.
+ * - Ownership & Validation: Only authenticated tutors can upload to their own UID directory.
+ * - MIME & Size Restrictions: Enforces PDF/JPEG/PNG format and 10MB maximum file size limit.
+ * - Public Access: Strictly DENIED. Unauthenticated users cannot read or write.
+ * - Manager Oversight: Managers can access DBS documents for review via backend workflows/role.
  */
 service firebase.storage {
   match /b/{bucket}/o {
-    // Default deny all client access across all storage paths
+
+    // Default deny all client access across all paths
     match /{allPaths=**} {
       allow read, write: if false;
+    }
+
+    // Private DBS Document Upload Path: dbs/{uid}/{filename}
+    match /dbs/{uid}/{filename} {
+      // Authenticated tutor can upload their own DBS document with strict validation
+      allow create, update: if request.auth != null
+        && request.auth.uid == uid
+        && request.auth.token.role == 'TUTOR'
+        && request.resource.size < 10 * 1024 * 1024 // 10MB maximum size limit
+        && (
+          request.resource.contentType.matches('application/pdf') ||
+          request.resource.contentType.matches('image/jpeg') ||
+          request.resource.contentType.matches('image/png')
+        );
+
+      // Tutor can read their own DBS document; Manager can read for review.
+      allow read: if request.auth != null
+        && (request.auth.uid == uid || request.auth.token.role == 'MANAGER');
+
+      // Client deletion DENIED
+      allow delete: if false;
     }
   }
 }

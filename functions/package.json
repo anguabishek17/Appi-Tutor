@@ -12,6 +12,8 @@
     "lint:fix": "eslint \"src/**/*.ts\" --fix",
     "build": "tsc",
     "build:watch": "tsc --watch",
+    "test": "npm run build && node --test lib/test/**/*.test.js",
+    "provision:manager": "npm run build && node lib/scripts/provision-manager.js",
     "serve": "npm run build && firebase emulators:start --only functions",
     "shell": "npm run build && firebase functions:shell",
     "start": "npm run shell",
@@ -24,6 +26,7 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@types/node": "^20.17.24",
     "eslint": "^9.22.0",
     "typescript": "^5.8.2",
