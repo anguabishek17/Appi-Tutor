@@ -81,13 +81,12 @@ const mockDb: any = {
   },
 };
 
-// Wire mockDb to getAdminFirestore
-(configModule as any).getAdminFirestore = () => mockDb;
-
 describe('[TUTOR ONBOARDING & MANAGER APPROVAL TESTS] Phase F04 Lifecycle & Security', () => {
   let testEnv: RulesTestEnvironment;
 
   before(async () => {
+    (configModule as any).getAdminFirestore = () => mockDb;
+
     const rulesPath = path.resolve(process.cwd(), '../firestore.rules');
     const fallbackPath = path.resolve(process.cwd(), 'firestore.rules');
     const rules = fs.existsSync(rulesPath)

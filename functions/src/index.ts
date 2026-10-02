@@ -64,6 +64,25 @@ export {
   managerReapproveTutor,
 } from './endpoints/tutorOnboarding';
 
+// Lesson Booking & Availability Endpoints (Phase F05)
+export {
+  createAvailabilitySlot,
+  getAvailableSlots,
+  updateAvailabilitySlot,
+  deleteAvailabilitySlot,
+  createBooking,
+  getMyBookings,
+  getBooking,
+  getTutorBookings,
+  confirmBooking,
+  rejectBooking,
+  proposeReschedule,
+  cancelBooking,
+  completeBooking,
+  managerListBookings,
+  managerCancelBooking,
+} from './endpoints/booking';
+
 // Export shared helpers, config, types, and middleware for subsequent phases
 export * from './config';
 export * from './helpers';

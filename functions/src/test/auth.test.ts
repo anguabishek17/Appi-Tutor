@@ -12,4 +12,5 @@ import './unit/auth-unit.test';
 import './integration/auth-emulator.test';
 import './integration/firestore-rules.test';
 import './integration/tutor-onboarding.test';
+import './integration/booking.test';
 import './frontend/auth-frontend.test';

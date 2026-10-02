@@ -2,8 +2,8 @@
 
 Enterprise tutoring web application built on Firebase serverless infrastructure and vanilla modern web architecture.
 
-> **Current Scope: Phase F04 — Tutor Onboarding, DBS & Manager Approval**  
-> This repository implements the full tutor onboarding lifecycle, DBS document submission & storage security rules, server-side manager approval/rejection/suspension workflows, audit logging, public directory publication engine, and comprehensive security tests. **F05 lesson booking engine, payments, and other business workflows belong to subsequent phases.**
+> **Current Scope: Phase F05 — Lesson Booking, Availability & Double-Booking Prevention**  
+> This repository implements the complete lesson booking system, availability slot creation/management, Firestore transactional double-booking prevention, central status transition validator, booking history tracking, role-based access control, frontend UI, and comprehensive test suite (F05-01 through F05-36). **F06 payments and notifications belong to subsequent phases.**
 
 ---
 
@@ -39,161 +39,126 @@ The UK Tutoring Platform provides a bespoke matching and lesson management solut
 │       ├── config/            # Region, environment, and services config
 │       ├── endpoints/
 │       │   ├── auth.ts        # registerUser & protected role example endpoints
-│       │   └── tutorOnboarding.ts # F04 profile update, DBS upload, manager review endpoints
-│       ├── helpers/           # Request IDs, response formatters, logger, Zod validation, roles
+│       │   ├── tutorOnboarding.ts # F04 profile update, DBS upload, manager review endpoints
+│       │   └── booking.ts     # F05 availability slots & transactional booking endpoints
+│       ├── helpers/           # Request IDs, response formatters, logger, Zod validation, roles, bookingValidator
 │       ├── middleware/        # Correlation wrapper & auth authorization middleware
 │       ├── test/
 │       │   ├── auth.test.ts   # Master test runner index
 │       │   ├── unit/          # Auth unit & mock tests
-│       │   ├── integration/   # HTTP integration, firestore rules & F04 onboarding tests (F04-01 to F04-23)
+│       │   ├── integration/   # HTTP integration, firestore rules, F04 onboarding & F05 booking tests (F05-01 to F05-36)
 │       │   └── frontend/      # Frontend auth service tests
-│       └── types/             # Shared TypeScript models (UserRole, UserStatus, Onboarding Enum definitions)
+│       └── types/             # Shared TypeScript models (UserRole, UserStatus, BookingStatus, AvailabilitySlot)
 │           ├── index.ts
-│           └── firestore.ts   # F03/F04 Firestore document schemas & type definitions
+│           └── firestore.ts   # F03/F04/F05 Firestore document schemas & type definitions
 │
 └── web/                       # Frontend Web Application
     ├── package.json
     ├── vite.config.js         # Vite bundler configuration
     ├── index.html             # HTML5 SPA entry point
-    └── src/                   # Auth, Onboarding & Manager Review components
+    └── src/                   # Auth, Onboarding & Booking components
         ├── main.js
         └── components/
             ├── authUI.js      # Auth component
-            └── tutorOnboardingUI.js # Tutor onboarding & Manager review UI
+            ├── tutorOnboardingUI.js # Tutor onboarding & Manager review UI
+            └── bookingUI.js   # F05 Lesson booking & availability management UI
 ```
 
 ---
 
-## 3. Tutor Onboarding Lifecycle & State Transitions
+## 3. Lesson Booking Lifecycle & State Transitions
 
-Tutors progress through an explicit, server-verified lifecycle:
+Bookings follow an explicit, server-verified lifecycle:
 
 ```text
-  [REGISTER]
-      │
-      ▼
-[EMAIL_VERIFIED] ──(Tutor completes bio, subjects, rate)──► [PROFILE_COMPLETE]
-                                                                  │
-                                                        (Submits DBS document)
-                                                                  │
-                                                                  ▼
-                                                          [DBS_SUBMITTED]
-                                                                  │
-                                                        (Transitions on submit)
-                                                                  │
-                                                                  ▼
-                                                          [PENDING_REVIEW]
-                                                                 │ │
-                                                ┌────────────────┘ └──────────────┐
-                                                │ (Manager Approves)               │ (Manager Rejects)
-                                                ▼                                 ▼
-                                       [MANAGER_APPROVED]                    [REJECTED]
-                                       (Bookable & Public)              (Not Bookable/Public)
-                                                │ ▲
-                            (Manager Suspends)  │ │ (Manager Re-approves)
-                                                ▼ │
-                                           [SUSPENDED]
-                                     (Not Bookable/Public)
+               ┌──────────────────────────────┐
+               │           PENDING            │
+               └──────────────┬───────────────┘
+                              │
+         ┌────────────────────┼────────────────────┬────────────────────┐
+         │                    │                    │                    │
+         ▼                    ▼                    ▼                    ▼
+   [CONFIRMED]            [REJECTED]     [RESCHEDULE_PROPOSED]     [CANCELLED]
+         │                                         │
+    ┌────┴────┐                             ┌──────┴──────┐
+    │         │                             │             │
+    ▼         ▼                             ▼             ▼
+[COMPLETED] [CANCELLED]                 [PENDING]    [CANCELLED]/[REJECTED]
 ```
 
-### Supported State Transitions
+### Transition Rules
 
-- `PENDING_REVIEW` → `MANAGER_APPROVED` (Manager approval)
-- `PENDING_REVIEW` → `REJECTED` (Manager rejection)
-- `MANAGER_APPROVED` → `SUSPENDED` (Manager suspension)
-- `SUSPENDED` → `MANAGER_APPROVED` (Manager re-approval)
+- `PENDING` → `CONFIRMED`, `REJECTED`, `RESCHEDULE_PROPOSED`, `CANCELLED`, `SYSTEM_CANCELLED`
+- `CONFIRMED` → `COMPLETED`, `CANCELLED`, `SYSTEM_CANCELLED`
+- `RESCHEDULE_PROPOSED` → `PENDING`, `CANCELLED`, `REJECTED`, `SYSTEM_CANCELLED`
 
-Invalid state transitions (e.g. `REJECTED` → `MANAGER_APPROVED` directly, or client-driven state modification) are rejected by server-side state transition guards.
-
----
-
-## 4. DBS Submission & Storage Architecture
-
-### File Storage Location
-DBS document files are stored privately in Cloud Storage under:
-`dbs/{uid}/{filename}`
-
-### Access Control (`storage.rules`)
-- **Default Deny**: All unmapped storage paths default to deny.
-- **Tutor Access**: Tutors may only read and write files within `dbs/{uid}/*` where `request.auth.uid == uid`.
-- **Manager Access**: Managers (`request.auth.token.role == 'MANAGER'`) can read files in `dbs/{uid}/*` for verification.
-- **Client Restrictions**: Cross-tutor read/write is strictly denied. Unauthenticated access is denied.
-
-### Technical File Validation
-- Maximum file size: **10 MB** (`10 * 1024 * 1024` bytes).
-- Allowed MIME types: `application/pdf`, `image/jpeg`, `image/png`.
-- File content and path ownership are verified prior to updating profile state to `DBS_SUBMITTED` / `PENDING_REVIEW`.
-
-> **Safeguarding & Legal Notice**: The DBS submission workflow is a technical data collection and review pipeline. It does **not** constitute automated legal verification or background validation against the UK Disclosure and Barring Service database. Legal verification remains the responsibility of authorized platform managers during review.
+All invalid status transitions are rejected with error `BOOKING_INVALID_STATE_TRANSITION`.
 
 ---
 
-## 5. Manager Approval & Security Boundaries
+## 4. Double-Booking Prevention & Concurrency Authority
 
-### Server-Side Authority
-- All manager operations (`managerApproveTutor`, `managerRejectTutor`, `managerSuspendTutor`, `managerReapproveTutor`) require Firebase Auth custom claim `role == 'MANAGER'`.
-- All status transitions, public tutor record creation/deletion, and audit logging execute within atomic **Firestore Transactions** using the Firebase Admin SDK.
-- The client cannot directly write to `publicTutors/{uid}` or update authoritative fields (`approvalStatus`, `onboardingStatus`, `dbsStatus`, `isBookable`, `isPublic`) in `tutorProfiles/{uid}`.
-
-### Audit Trail (`auditLogs/{id}`)
-Every manager lifecycle action automatically generates an immutable audit document in `auditLogs/{id}` containing:
-- `actorUid`: Manager UID
-- `action`: `TUTOR_APPROVAL`, `TUTOR_REJECTION`, `TUTOR_SUSPENSION`, or `TUTOR_REAPPROVAL`
-- `targetTutorUid`: Tutor UID
-- `timestamp`: ISO timestamp
-- `requestId`: Request correlation ID
-- `reason`: Optional manager notes (for rejections/suspensions)
-
-Sensitive credentials (passwords, tokens, raw DBS file contents) are **never** logged.
+- **Firestore Concurrency Authority**: Double-booking prevention uses Firestore transactions (`db.runTransaction`).
+- **Atomic Operations**:
+  1. Read availability slot (`availabilitySlots/{slotId}`).
+  2. Verify slot existence & `status === 'AVAILABLE'`.
+  3. Verify tutor `approvalStatus === 'APPROVED' / 'MANAGER_APPROVED'`, `isBookable === true`, `isPublic === true`.
+  4. Write `bookings/{bookingId}` document with status `'PENDING'`.
+  5. Atomically update slot status to `'BOOKED'` and attach `bookingId`.
+- **Race Condition Prevention**: If two concurrent booking requests target the same slot, exactly one transaction succeeds and the second transaction fails safely with `SLOT_ALREADY_BOOKED` (409).
 
 ---
 
-## 6. Public Directory Model (`publicTutors/{uid}`)
+## 5. Automated Test Suite (F05-01 to F05-36)
 
-- **Read Model**: `publicTutors/{uid}` is readable by the public (`allow read: if true`).
-- **Data Boundaries**: Contains only public display fields (`uid`, `displayName`, `bio`, `subjects`, `hourlyRatePounds`, `profileImageUrl`, `updatedAt`).
-- **Exclusions**: Private contact details, phone numbers, DBS document links, manager notes, and internal audit metadata are strictly excluded.
-- **Publication Lifecycle**:
-  - `publicTutors/{uid}` document is created/updated **only** when a tutor achieves `MANAGER_APPROVED` status.
-  - When a tutor is `REJECTED` or `SUSPENDED`, the `publicTutors/{uid}` document is **immediately deleted** by server transaction.
+| Test ID    | Objective                                                   | Expected Result | Status |
+| :--------- | :---------------------------------------------------------- | :-------------- | :----- |
+| **F05-01** | Tutor can create availability                               | ALLOWED         | PASS   |
+| **F05-02** | Non-tutor cannot create tutor availability                  | DENIED          | PASS   |
+| **F05-03** | Unapproved tutor cannot create bookable availability        | DENIED (403)    | PASS   |
+| **F05-04** | Approved/bookable tutor can create availability             | ALLOWED         | PASS   |
+| **F05-05** | Tutor cannot modify another tutor's availability            | DENIED (403)    | PASS   |
+| **F05-06** | Student can retrieve available slots                        | ALLOWED         | PASS   |
+| **F05-07** | Private tutor data is not exposed through availability      | VERIFIED        | PASS   |
+| **F05-08** | Student can create booking                                  | ALLOWED         | PASS   |
+| **F05-09** | Booking starts in PENDING                                   | VERIFIED        | PASS   |
+| **F05-10** | Booking contains initial statusHistory entry                | VERIFIED        | PASS   |
+| **F05-11** | Student cannot directly modify booking status               | DENIED          | PASS   |
+| **F05-12** | Student cannot modify statusHistory                         | DENIED          | PASS   |
+| **F05-13** | Tutor can view their own bookings                           | ALLOWED         | PASS   |
+| **F05-14** | Tutor cannot view another tutor's private bookings          | DENIED (403)    | PASS   |
+| **F05-15** | Valid PENDING → CONFIRMED transition succeeds               | ALLOWED         | PASS   |
+| **F05-16** | Valid PENDING → REJECTED transition succeeds                | ALLOWED         | PASS   |
+| **F05-17** | Valid PENDING → RESCHEDULE_PROPOSED transition succeeds     | ALLOWED         | PASS   |
+| **F05-18** | Valid booking cancellation succeeds where permitted         | ALLOWED         | PASS   |
+| **F05-19** | Valid CONFIRMED → COMPLETED transition succeeds             | ALLOWED         | PASS   |
+| **F05-20** | Invalid booking transition is rejected                      | REJECTED (400)  | PASS   |
+| **F05-21** | Booking history is appended on status change                | VERIFIED        | PASS   |
+| **F05-22** | Previous status history cannot be rewritten by client       | VERIFIED        | PASS   |
+| **F05-23** | Already reserved slot cannot be booked again                | REJECTED (409)  | PASS   |
+| **F05-24** | Concurrent booking attempts cannot double-book a slot       | VERIFIED        | PASS   |
+| **F05-25** | Exactly one booking wins the concurrent race                | VERIFIED        | PASS   |
+| **F05-26** | Tutor suspension prevents new booking activity              | DENIED (403)    | PASS   |
+| **F05-27** | Server checks tutor bookable state                          | VERIFIED        | PASS   |
+| **F05-28** | Booking timestamps are stored using server timestamps       | VERIFIED        | PASS   |
+| **F05-29** | UTC timestamps are correctly represented as Europe/London   | VERIFIED        | PASS   |
+| **F05-30** | Manager can access permitted booking administration         | ALLOWED         | PASS   |
+| **F05-31** | Unauthorized user cannot access manager booking functions   | DENIED (403)    | PASS   |
+| **F05-32** | Sensitive manager action creates audit log where applicable | VERIFIED        | PASS   |
+| **F05-33** | F01 regression passes                                       | PASS            | PASS   |
+| **F05-34** | F02 regression passes                                       | PASS            | PASS   |
+| **F05-35** | F03 regression passes                                       | PASS            | PASS   |
+| **F05-36** | F04 regression passes                                       | PASS            | PASS   |
 
 ---
 
-## 7. Automated Test Suite (F04-01 to F04-23)
-
-| Test ID | Objective | Expected Result | Status |
-| :--- | :--- | :--- | :--- |
-| **F04-01** | Tutor can create/update their own onboarding profile | ALLOWED | PASS |
-| **F04-02** | Tutor cannot update another tutor's profile | DENIED | PASS |
-| **F04-03** | Tutor cannot self-approve | DENIED | PASS |
-| **F04-04** | Tutor cannot self-set `isBookable = true` | DENIED | PASS |
-| **F04-05** | Tutor cannot self-set `isPublic = true` | DENIED | PASS |
-| **F04-06** | Tutor cannot self-set DBS verified/approved | DENIED | PASS |
-| **F04-07** | Unauthenticated user cannot access tutor onboarding endpoints | DENIED (401) | PASS |
-| **F04-08** | Non-tutor (`STUDENT_PARENT`) cannot use tutor onboarding endpoints | DENIED (403) | PASS |
-| **F04-09** | Non-manager cannot approve a tutor | DENIED (403) | PASS |
-| **F04-10** | Manager can view pending tutor review data | ALLOWED | PASS |
-| **F04-11/12**| Manager can approve a valid tutor & publish to `publicTutors` | ALLOWED | PASS |
-| **F04-13** | Rejected tutor is not public/bookable | VERIFIED | PASS |
-| **F04-14/15**| Manager can suspend an approved tutor & unpublish | ALLOWED | PASS |
-| **F04-16** | Manager can re-approve a suspended tutor | ALLOWED | PASS |
-| **F04-17** | Tutor cannot directly write `publicTutors` | DENIED | PASS |
-| **F04-18** | Tutor cannot access another tutor's private DBS data | DENIED | PASS |
-| **F04-19** | Unauthorized user cannot access private DBS data | DENIED | PASS |
-| **F04-20** | Manager actions create protected audit records | VERIFIED | PASS |
-| **F04-21** | Invalid lifecycle transitions are rejected | REJECTED | PASS |
-| **F04-22** | Concurrent manager state changes are handled safely | VERIFIED | PASS |
-| **F04-23** | Regression check: F01/F02/F03 tests remain fully functional | PASS (110/110) | PASS |
-
----
-
-## 8. Execution Commands & Quality Verification
+## 6. Execution Commands & Quality Verification
 
 ```bash
 # Build both Cloud Functions and Web workspace
 npm run build
 
-# Run master test suite (110 tests across 10 suites)
+# Run master test suite (182 tests across 12 suites)
 npm test
 
 # Run ESLint across all workspaces
@@ -208,31 +173,21 @@ npm run format
 
 ---
 
-## 9. Deferred Functionality (F05+)
+## 7. Open Business Decisions
 
-The following business workflows are intentionally deferred to future phases:
-
-- Booking engine, scheduling calendar, double-booking prevention & availability locks (F05)
-- Stripe payment processing & payout engine (F06)
-- Transactional email & SMS notification system (F07)
-- CMS blog management & public contact form processing (F08)
+1. **Cancellation Windows & Fees**: Does the platform impose a minimum notice window (e.g., 24 hours prior to lesson start) before a student can cancel without penalty? Isolated as configurable business setting.
+2. **Reschedule Limits**: How many times can a booking transition between `RESCHEDULE_PROPOSED` and `PENDING` before requiring manager review or automatic cancellation? Isolated as configurable business setting.
+3. **Slot Duration Constraints**: Should slots enforce a fixed duration (e.g. 60 mins), or allow arbitrary duration windows set by tutors? Currently supports arbitrary ranges with `startAt < endAt` validation.
 
 ---
 
-## 10. Open Questions
+## 8. Phase Status Summary
 
-1. **DBS Expiry Monitoring**: Should future phases implement an automated cron trigger to flag DBS certificates that exceed 3 years from issue date, or rely on manual manager re-review?
-2. **Rejection Resubmission**: Can a `REJECTED` tutor submit an updated DBS document to re-enter `PENDING_REVIEW`, or is manager intervention required to reset state to `DBS_SUBMITTED`?
-
----
-
-## 11. Phase Status Summary
-
-| Phase | Description | Status |
-| :--- | :--- | :--- |
-| **F01** | Project Foundation & Monorepo Tooling | **Complete** |
-| **F02** | Authentication, Roles & Authorization Middleware | **Complete** |
-| **F03** | Firestore Data Model & Security Rules | **Complete** |
-| **F04** | Tutor Onboarding, DBS & Manager Approval | **Complete** |
-| **F05+** | Lesson Booking Engine, Payments, Email & CMS | _Pending_ |
-
+| Phase    | Description                                              | Status       |
+| :------- | :------------------------------------------------------- | :----------- |
+| **F01**  | Project Foundation & Monorepo Tooling                    | **Complete** |
+| **F02**  | Authentication, Roles & Authorization Middleware         | **Complete** |
+| **F03**  | Firestore Data Model & Security Rules                    | **Complete** |
+| **F04**  | Tutor Onboarding, DBS & Manager Approval                 | **Complete** |
+| **F05**  | Lesson Booking, Availability & Double-Booking Prevention | **Complete** |
+| **F06+** | Payments, Email Notifications & Advanced Features        | _Pending_    |

@@ -135,7 +135,9 @@ export interface AvailabilitySlotDocument {
   tutorId: string;
   startAt: unknown; // UTC Instant / Firestore Timestamp
   endAt: unknown; // UTC Instant / Firestore Timestamp
+  timezone?: string; // e.g. "Europe/London"
   status: AvailabilitySlotStatus;
+  bookingId?: string | null;
   createdAt: unknown;
   updatedAt: unknown;
 }
@@ -147,6 +149,7 @@ export interface BookingStatusHistoryEntry {
   status: BookingStatus;
   changedAt: unknown;
   changedBy: string; // User UID or 'SYSTEM'
+  changedByRole?: string; // 'STUDENT_PARENT' | 'TUTOR' | 'MANAGER' | 'SYSTEM'
   reason?: string;
 }
 
@@ -156,8 +159,9 @@ export interface BookingStatusHistoryEntry {
 export interface BookingDocument {
   bookingId: string;
   studentUid: string;
-  childId?: string | null;
+  parentId?: string | null;
   tutorUid: string;
+  childId?: string | null;
   slotId?: string | null;
   startAt: unknown;
   endAt: unknown;
